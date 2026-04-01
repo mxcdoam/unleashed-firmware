@@ -283,7 +283,7 @@ const char* furi_hal_version_get_hw_region_name_otp(void) {
 }
 
 FuriHalVersionDisplay furi_hal_version_get_hw_display(void) {
-    return furi_hal_version.board_display;
+    return FuriHalVersionDisplayErc;
 }
 
 uint32_t furi_hal_version_get_hw_timestamp(void) {
