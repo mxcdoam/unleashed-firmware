@@ -1,3 +1,5 @@
+//Based on parsers written by Leptoptilos and Assasinfil. Also, thanks to WillyJL (<me@willyjl.dev>) for help!
+
 #include "nfc_supported_card_plugin.h"
 #include <flipper_application/flipper_application.h>
 #include <nfc/nfc_device.h>

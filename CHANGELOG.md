@@ -4,11 +4,14 @@
 * SubGHz: Add **CAME TOP44FGN** support in CAME TWEE protocol
 * SubGHz: Add all 0x0s and all 0xFs KeeLoq MF codes for normal and simple learning
 * SubGHz: **Fix CAME TWEE repeats count for button click**
+* NFC: Add **ISO15693-3 and SLIX write-back support** (PR #984 | by @DoniyorI)
 * NFC: **Fix "MIR" and other EMV cards crash on Read** (by @Dmitry422)
-* NFC: Add Mifare Ultralight C Write Support (by @haw8411)
-* OFW PR 4362: NFC: Fix BusFault in Write to Initial Card (by @akrylysov)
-* Apps: Build tag (**27mar2026**) - **Check out more Apps updates and fixes by following** [this link](https://github.com/xMasterX/all-the-plugins/commits/dev)
+* NFC: Add **Mifare Ultralight C Write Support** (by @haw8411)
+* NFC: Add **new parsers SZPPK, SKPPK and SevPPK**, upgrade Plantain parser, fix TwoCities parser (PR #981 | by @mxcdoam)
+* OFW PR 4362: NFC: **Fix BusFault** in Write to Initial Card (by @akrylysov)
+* Apps: Build tag (**1apr2026**) - **Check out more Apps updates and fixes by following** [this link](https://github.com/xMasterX/all-the-plugins/commits/dev)
 ## Other changes
+* OFW PR 4364: JS: Address utf8 support when uploading JavaScript application (by @bekindpleaserewind)
 * Display: Extend lcd contrast range to full ST756x 6-bit range (by @ShaTie) (reduced to -10 to +18 to avoid fully unreadable state)
 <br><br>
 #### Known NFC post-refactor regressions list: 
