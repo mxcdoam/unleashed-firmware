@@ -187,6 +187,18 @@ App(
     ],
     fal_embedded=True,
 )
+
+App(
+    appid="nfc_fudan_fm11rf005",
+    targets=["f7"],
+    apptype=FlipperAppType.PLUGIN,
+    entry_point="nfc_fudan_fm11rf005_ep",
+    requires=["nfc"],
+    sources=[
+        "helpers/protocol_support/fudan_fm11rf005/*.c",
+    ],
+    fal_embedded=True,
+)
 App(
     appid="nfc_type_4_tag",
     targets=["f7"],

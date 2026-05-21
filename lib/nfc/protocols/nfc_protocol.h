@@ -191,6 +191,7 @@ typedef enum {
     NfcProtocolNtag4xx,
     NfcProtocolType4Tag,
     NfcProtocolEmv,
+    NfcProtocolFudanFm11rf005,
     /* Add new protocols here */
 
     NfcProtocolNum, /**< Special value representing the number of available protocols. */

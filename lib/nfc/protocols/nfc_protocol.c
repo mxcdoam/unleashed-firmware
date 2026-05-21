@@ -14,9 +14,9 @@
  *
  *                                                  (Start)
  *                                                     |
- *                            +------------------------+-----------+---------+------------+
- *                            |                        |           |         |            |
- *                       ISO14443-3A              ISO14443-3B    Felica  ISO15693-3    ST25TB
+ *                            +------------------------+-----------+---------+------------+-----------------+
+ *                            |                        |           |         |            |                 |
+ *                       ISO14443-3A              ISO14443-3B    Felica  ISO15693-3    ST25TB           FM11RF005
  *                            |                        |                     |
  *            +---------------+-------------+     ISO14443-4B              SLIX
  *            |               |             |
@@ -53,6 +53,7 @@ typedef struct {
 static const NfcProtocol nfc_protocol_iso14443_3a_children_protocol[] = {
     NfcProtocolIso14443_4a,
     NfcProtocolMfUltralight,
+    NfcProtocolFudanFm11rf005,
 };
 
 /** List of ISO14443-3B child protocols. */
@@ -176,6 +177,13 @@ static const NfcProtocolTreeNode nfc_protocol_nodes[NfcProtocolNum] = {
             .children_num = 0,
             .children_protocol = NULL,
         },
+    [NfcProtocolFudanFm11rf005] =
+        {
+            .parent_protocol = NfcProtocolInvalid,
+            .children_num = 0,
+            .children_protocol = NULL,
+        },
+
     /* Add new protocols here */
 };
 

@@ -1,5 +1,5 @@
 entry,status,name,type,params
-Version,+,87.8,,
+Version,+,88.0,,
 Header,+,applications/drivers/subghz/cc1101_ext/cc1101_ext_interconnect.h,,
 Header,+,applications/services/applications.h,,
 Header,+,applications/services/bt/bt_service/bt.h,,
@@ -157,6 +157,9 @@ Header,+,lib/nfc/protocols/felica/felica.h,,
 Header,+,lib/nfc/protocols/felica/felica_listener.h,,
 Header,+,lib/nfc/protocols/felica/felica_poller.h,,
 Header,+,lib/nfc/protocols/felica/felica_poller_sync.h,,
+Header,+,lib/nfc/protocols/fudan_fm11rf005/fudan_fm11rf005.h,,
+Header,+,lib/nfc/protocols/fudan_fm11rf005/fudan_fm11rf005_poller.h,,
+Header,+,lib/nfc/protocols/fudan_fm11rf005/fudan_fm11rf005_poller_sync.h,,
 Header,+,lib/nfc/protocols/iso14443_3a/iso14443_3a.h,,
 Header,+,lib/nfc/protocols/iso14443_3a/iso14443_3a_listener.h,,
 Header,+,lib/nfc/protocols/iso14443_3a/iso14443_3a_poller.h,,
@@ -1339,6 +1342,22 @@ Function,-,fsetpos,int,"FILE*, const fpos_t*"
 Function,-,ftell,long,FILE*
 Function,-,ftello,off_t,FILE*
 Function,-,ftrylockfile,int,FILE*
+Function,+,fudan_fm11rf005_alloc,FudanFm11rf005Data*,
+Function,+,fudan_fm11rf005_copy,void,"FudanFm11rf005Data*, const FudanFm11rf005Data*"
+Function,+,fudan_fm11rf005_free,void,FudanFm11rf005Data*
+Function,+,fudan_fm11rf005_get_base_data,FudanFm11rf005Data*,const FudanFm11rf005Data*
+Function,+,fudan_fm11rf005_get_name,const char*,"const FudanFm11rf005Data*, NfcDeviceNameType"
+Function,+,fudan_fm11rf005_get_type_from_atqa_sak,FudanFm11rf005Type,uint16_t
+Function,+,fudan_fm11rf005_get_uid,const uint8_t*,"const FudanFm11rf005Data*, size_t*"
+Function,+,fudan_fm11rf005_is_equal,_Bool,"const FudanFm11rf005Data*, const FudanFm11rf005Data*"
+Function,+,fudan_fm11rf005_load,_Bool,"FudanFm11rf005Data*, FlipperFormat*, uint32_t"
+Function,+,fudan_fm11rf005_poller_activate,FudanFm11rf005Error,"FudanFm11rf005Poller*, FudanFm11rf005Data*"
+Function,+,fudan_fm11rf005_poller_read_page,FudanFm11rf005Error,"FudanFm11rf005Poller*, uint8_t, uint8_t*"
+Function,+,fudan_fm11rf005_poller_sync_read_all,FudanFm11rf005Error,"Nfc*, FudanFm11rf005Data*"
+Function,+,fudan_fm11rf005_reset,void,FudanFm11rf005Data*
+Function,+,fudan_fm11rf005_save,_Bool,"const FudanFm11rf005Data*, FlipperFormat*"
+Function,+,fudan_fm11rf005_set_uid,_Bool,"FudanFm11rf005Data*, const uint8_t*, size_t"
+Function,+,fudan_fm11rf005_verify,_Bool,"const FudanFm11rf005Data*, const FuriString*"
 Function,-,funlockfile,void,FILE*
 Function,-,funopen,FILE*,"const void*, int (*)(void*, char*, int), int (*)(void*, const char*, int), fpos_t (*)(void*, fpos_t, int), int (*)(void*)"
 Function,-,furi_background,void,
@@ -5359,6 +5378,7 @@ Variable,+,message_vibro_off,const NotificationMessage,
 Variable,+,message_vibro_on,const NotificationMessage,
 Variable,-,nfc_device_emv,const NfcDeviceBase,
 Variable,-,nfc_device_felica,const NfcDeviceBase,
+Variable,+,nfc_device_fudan_fm11rf005,const NfcDeviceBase,
 Variable,-,nfc_device_mf_classic,const NfcDeviceBase,
 Variable,-,nfc_device_mf_desfire,const NfcDeviceBase,
 Variable,-,nfc_device_mf_plus,const NfcDeviceBase,
