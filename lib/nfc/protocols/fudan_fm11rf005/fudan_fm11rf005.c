@@ -53,9 +53,10 @@ bool fudan_fm11rf005_verify(const FudanFm11rf005Data* data, const FuriString* de
     return furi_string_equal_str(device_type, FUDAN_PROTOCOL_NAME);
 }
 
-FudanFm11rf005Type fudan_fm11rf005_get_type_from_atqa_sak(uint16_t atqa) {
-    if(atqa == 0x0003) return FudanFm11rf005TypeFM11RF005SH;
-    if(atqa == 0x0005) return FudanFm11rf005TypeFM11RF005;
+FudanFm11rf005Type fudan_fm11rf005_get_type_from_atqa_sak(uint16_t atqa, uint8_t sak) {
+    if(sak == 0x0A && atqa == 0x0003) return FudanFm11rf005TypeFM11RF005SH;
+    if(sak == 0x0A && atqa == 0x0005)
+        return FudanFm11rf005TypeFM11RF005;
     else
         return FudanFm11rf005TypeUnknown;
 }
@@ -68,7 +69,7 @@ bool fudan_fm11rf005_load(FudanFm11rf005Data* data, FlipperFormat* ff, uint32_t 
     do {
         if(version < NFC_UNIFIED_FORMAT_VERSION) break;
 
-        if(!flipper_format_read_hex(ff, "UID", data->uid, FUDAN_FM11RF005_UID_SIZE)) break;
+        if(!flipper_format_read_hex(ff, "UID", data->pages[1], FUDAN_FM11RF005_UID_SIZE)) break;
         if(!flipper_format_read_hex(ff, "Pages", (uint8_t*)data->pages, FUDAN_FM11RF005_DATA_SIZE))
             break;
         if(!flipper_format_read_hex(
@@ -76,7 +77,7 @@ bool fudan_fm11rf005_load(FudanFm11rf005Data* data, FlipperFormat* ff, uint32_t 
             break;
         if(!flipper_format_read_hex(ff, FUDAN_SAK_KEY, &data->sak, 1)) break;
 
-        data->type = fudan_fm11rf005_get_type_from_atqa_sak(data->atqa);
+        data->type = fudan_fm11rf005_get_type_from_atqa_sak(data->atqa, data->sak);
 
         parsed = true;
     } while(false);
@@ -92,7 +93,7 @@ bool fudan_fm11rf005_save(const FudanFm11rf005Data* data, FlipperFormat* ff) {
 
     do {
         if(!flipper_format_write_comment_cstr(ff, FUDAN_PROTOCOL_NAME " specific data")) break;
-        if(!flipper_format_write_hex(ff, "UID", data->uid, FUDAN_FM11RF005_UID_SIZE)) break;
+        if(!flipper_format_write_hex(ff, "UID", data->pages[1], FUDAN_FM11RF005_UID_SIZE)) break;
         if(!flipper_format_write_hex(
                ff, "Pages", (const uint8_t*)data->pages, FUDAN_FM11RF005_DATA_SIZE))
             break;

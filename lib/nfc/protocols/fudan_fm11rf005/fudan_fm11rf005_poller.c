@@ -7,8 +7,6 @@
 
 #define TAG "FudanPoller"
 
-typedef NfcCommand (*FudanFm11rf005PollerStateHandler)(FudanFm11rf005Poller* instance);
-
 const FudanFm11rf005Data* fudan_fm11rf005_poller_get_data(FudanFm11rf005Poller* instance) {
     furi_assert(instance);
     furi_assert(instance->data);
@@ -20,7 +18,6 @@ static FudanFm11rf005Poller* fudan_fm11rf005_poller_alloc(Nfc* nfc) {
 
     FudanFm11rf005Poller* instance = malloc(sizeof(FudanFm11rf005Poller));
     instance->nfc = nfc;
-    instance->state = FudanFm11rf005PollerStateIdle;
     instance->tx_buffer = bit_buffer_alloc(FUDAN_FM11RF005_POLLER_MAX_BUFFER_SIZE);
     instance->rx_buffer = bit_buffer_alloc(FUDAN_FM11RF005_POLLER_MAX_BUFFER_SIZE);
 
@@ -109,183 +106,67 @@ FudanFm11rf005Error fudan_fm11rf005_poller_frame_exchange(
 }
 
 FudanFm11rf005Error
-    fudan_fm11rf005_poller_sdd_exchange(FudanFm11rf005Poller* instance, BitBuffer* rx_buffer) {
-    furi_assert(instance);
-    furi_assert(rx_buffer);
-
-    FudanFm11rf005Error ret = FudanFm11rf005ErrorNone;
-
-    do {
-        NfcError error = nfc_iso14443a_poller_trx_sdd_frame(
-            instance->nfc, instance->tx_buffer, instance->rx_buffer, FUDAN_FM11RF005_FDT_POLL_FC);
-        if(error != NfcErrorNone) {
-            ret = fudan_fm11rf005_poller_process_error(error);
-            break;
-        }
-
-        bit_buffer_copy(rx_buffer, instance->rx_buffer);
-    } while(false);
-
-    return ret;
-}
-
-FudanFm11rf005Error
     fudan_fm11rf005_poller_activate(FudanFm11rf005Poller* instance, FudanFm11rf005Data* data) {
     furi_assert(instance);
     furi_assert(data);
 
-    FudanFm11rf005Error ret = FudanFm11rf005ErrorNone;
+    fudan_fm11rf005_reset(data);
 
-    do {
+    bit_buffer_reset(instance->tx_buffer);
+    bit_buffer_reset(instance->rx_buffer);
+
+    NfcError error = nfc_iso14443a_poller_trx_short_frame(
+        instance->nfc,
+        NfcIso14443aShortFrameSensReq,
+        instance->rx_buffer,
+        FUDAN_FM11RF005_FDT_POLL_FC);
+    if(error != NfcErrorNone) return fudan_fm11rf005_poller_process_error(error);
+    if(bit_buffer_get_size_bytes(instance->rx_buffer) < 2) return FudanFm11rf005ErrorCommunication;
+
+    uint8_t cid[2];
+    bit_buffer_write_bytes(instance->rx_buffer, cid, sizeof(cid));
+    data->atqa = ((uint16_t)cid[1] << 8) | cid[0];
+
+    bit_buffer_reset(instance->tx_buffer);
+    bit_buffer_reset(instance->rx_buffer);
+
+    uint8_t sel_cmd[1] = {0x93};
+    bit_buffer_copy_bytes(instance->tx_buffer, sel_cmd, sizeof(sel_cmd));
+    iso14443_crc_append(Iso14443CrcTypeA, instance->tx_buffer);
+
+    //FURI_LOG_D(TAG, "SELECT: sending 0x93 + CRC via custom_parity");
+    NfcError nfc_err = nfc_iso14443a_poller_trx_custom_parity(
+        instance->nfc, instance->tx_buffer, instance->rx_buffer, FUDAN_FM11RF005_FDT_POLL_FC);
+
+    data->sak = 0;
+    if(nfc_err == NfcErrorNone && bit_buffer_get_size_bytes(instance->rx_buffer) >= 1) {
+        data->sak = bit_buffer_get_byte(instance->rx_buffer, 0);
+        //FURI_LOG_D(TAG, "SELECT: rx SAK=0x%02X", data->sak);
+    }
+
+    for(uint8_t i = 0; i < FUDAN_FM11RF005_PAGE_NUM; i++) {
         bit_buffer_reset(instance->tx_buffer);
         bit_buffer_reset(instance->rx_buffer);
 
-        NfcError error = nfc_iso14443a_poller_trx_short_frame(
-            instance->nfc,
-            NfcIso14443aShortFrameSensReq,
-            instance->rx_buffer,
-            FUDAN_FM11RF005_FDT_POLL_FC);
-        if(error != NfcErrorNone) {
-            ret = fudan_fm11rf005_poller_process_error(error);
-            break;
-        }
-
-        if(bit_buffer_get_size_bytes(instance->rx_buffer) < 2) {
-            ret = FudanFm11rf005ErrorCommunication;
-            break;
-        }
-
-        uint16_t atqa = 0;
-        bit_buffer_write_bytes(instance->rx_buffer, &atqa, sizeof(atqa));
-        data->atqa = atqa;
-        FURI_LOG_D(TAG, "ATQA: 0x%04X", atqa);
-
-        bit_buffer_reset(instance->tx_buffer);
-        bit_buffer_reset(instance->rx_buffer);
-
-        bit_buffer_set_size_bytes(instance->tx_buffer, 2);
-        bit_buffer_set_byte(instance->tx_buffer, 0, 0x93);
-        bit_buffer_set_byte(instance->tx_buffer, 1, 0x20);
-
-        FudanFm11rf005Error sdd_err =
-            fudan_fm11rf005_poller_sdd_exchange(instance, instance->rx_buffer);
-        if(sdd_err != FudanFm11rf005ErrorNone) {
-            FURI_LOG_W(TAG, "SDD failed, card activated with CID only");
-            ret = FudanFm11rf005ErrorNone;
-            break;
-        }
-
-        size_t rx_len = bit_buffer_get_size_bytes(instance->rx_buffer);
-        FURI_LOG_D(TAG, "SDD response length: %d", rx_len);
-
-        if(rx_len >= 5) {
-            uint8_t uid_buf[4] = {0};
-            bit_buffer_write_bytes(instance->rx_buffer, &uid_buf, 4);
-            memcpy(data->uid, uid_buf, FUDAN_FM11RF005_UID_SIZE);
-
-            bit_buffer_reset(instance->tx_buffer);
-            bit_buffer_reset(instance->rx_buffer);
-
-            uint8_t sel_cmd[7];
-            sel_cmd[0] = 0x93;
-            sel_cmd[1] = 0x70;
-            memcpy(&sel_cmd[2], data->uid, 4);
-            sel_cmd[6] = data->uid[0] ^ data->uid[1] ^ data->uid[2] ^ data->uid[3];
-            bit_buffer_copy_bytes(instance->tx_buffer, sel_cmd, sizeof(sel_cmd));
-
-            FudanFm11rf005Error sel_err = fudan_fm11rf005_poller_frame_exchange(
-                instance, instance->tx_buffer, instance->rx_buffer, FUDAN_FM11RF005_FDT_POLL_FC);
-            if(sel_err == FudanFm11rf005ErrorNone) {
-                if(bit_buffer_get_size_bytes(instance->rx_buffer) >= 1) {
-                    data->sak = bit_buffer_get_byte(instance->rx_buffer, 0);
-                    data->type = fudan_fm11rf005_get_type_from_atqa_sak(data->atqa);
-                }
-            }
-        }
-    } while(false);
-
-    return ret;
-}
-
-FudanFm11rf005Error fudan_fm11rf005_poller_read_page(
-    FudanFm11rf005Poller* instance,
-    uint8_t page,
-    uint8_t* page_data) {
-    furi_assert(instance);
-    furi_assert(page < FUDAN_FM11RF005_PAGE_NUM);
-    furi_assert(page_data);
-
-    FudanFm11rf005Error ret = FudanFm11rf005ErrorNone;
-
-    do {
-        bit_buffer_reset(instance->tx_buffer);
-
-        uint8_t cmd[2];
-        cmd[0] = FUDAN_FM11RF005_CMD_READ;
-        cmd[1] = page;
+        uint8_t cmd[2] = {FUDAN_FM11RF005_CMD_READ, i};
         bit_buffer_copy_bytes(instance->tx_buffer, cmd, sizeof(cmd));
 
-        ret = fudan_fm11rf005_poller_frame_exchange(
+        FudanFm11rf005Error page_err = fudan_fm11rf005_poller_frame_exchange(
             instance, instance->tx_buffer, instance->rx_buffer, FUDAN_FM11RF005_FDT_POLL_FC);
-        if(ret != FudanFm11rf005ErrorNone) break;
-
-        if(bit_buffer_get_size_bytes(instance->rx_buffer) < FUDAN_FM11RF005_PAGE_SIZE) {
-            ret = FudanFm11rf005ErrorCommunication;
-            break;
+        if(page_err == FudanFm11rf005ErrorNone &&
+           bit_buffer_get_size_bytes(instance->rx_buffer) >= FUDAN_FM11RF005_PAGE_SIZE) {
+            bit_buffer_write_bytes(instance->rx_buffer, data->pages[i], FUDAN_FM11RF005_PAGE_SIZE);
+        } else {
+            memset(data->pages[i], 0, FUDAN_FM11RF005_PAGE_SIZE);
         }
-
-        bit_buffer_write_bytes(instance->rx_buffer, page_data, FUDAN_FM11RF005_PAGE_SIZE);
-    } while(false);
-
-    return ret;
-}
-
-static NfcCommand fudan_fm11rf005_poller_state_idle_handler(FudanFm11rf005Poller* instance) {
-    fudan_fm11rf005_reset(instance->data);
-    instance->state = FudanFm11rf005PollerStateActivate;
-    return NfcCommandContinue;
-}
-
-static NfcCommand fudan_fm11rf005_poller_state_activate_handler(FudanFm11rf005Poller* instance) {
-    FudanFm11rf005Error error = fudan_fm11rf005_poller_activate(instance, instance->data);
-
-    if(error == FudanFm11rf005ErrorNone) {
-        instance->state = FudanFm11rf005PollerStateReadPages;
-        instance->current_page = 0;
-    } else {
-        instance->fudan_event.type = FudanFm11rf005PollerEventTypeError;
-        instance->fudan_event_data.error = error;
-        instance->callback(instance->general_event, instance->context);
-        return NfcCommandStop;
     }
 
-    return NfcCommandContinue;
+    memcpy(data->uid, data->pages[1], FUDAN_FM11RF005_UID_SIZE);
+
+    data->type = fudan_fm11rf005_get_type_from_atqa_sak(data->atqa, data->sak);
+
+    return FudanFm11rf005ErrorNone;
 }
-
-static NfcCommand fudan_fm11rf005_poller_state_read_handler(FudanFm11rf005Poller* instance) {
-    FudanFm11rf005Error error = fudan_fm11rf005_poller_read_page(
-        instance, instance->current_page, instance->data->pages[instance->current_page]);
-
-    if(error != FudanFm11rf005ErrorNone) {
-        memset(instance->data->pages[instance->current_page], 0, FUDAN_FM11RF005_PAGE_SIZE);
-    }
-
-    instance->current_page++;
-    if(instance->current_page >= FUDAN_FM11RF005_PAGE_NUM) {
-        instance->fudan_event.type = FudanFm11rf005PollerEventTypeSuccess;
-        instance->callback(instance->general_event, instance->context);
-        return NfcCommandStop;
-    }
-
-    return NfcCommandContinue;
-}
-
-static FudanFm11rf005PollerStateHandler
-    fudan_fm11rf005_poller_state_handlers[FudanFm11rf005PollerStateNum] = {
-        [FudanFm11rf005PollerStateIdle] = fudan_fm11rf005_poller_state_idle_handler,
-        [FudanFm11rf005PollerStateActivate] = fudan_fm11rf005_poller_state_activate_handler,
-        [FudanFm11rf005PollerStateReadPages] = fudan_fm11rf005_poller_state_read_handler,
-};
 
 static NfcCommand fudan_fm11rf005_poller_run(NfcGenericEvent event, void* context) {
     furi_assert(context);
@@ -294,15 +175,20 @@ static NfcCommand fudan_fm11rf005_poller_run(NfcGenericEvent event, void* contex
 
     FudanFm11rf005Poller* instance = context;
     NfcEvent* nfc_event = event.event_data;
-    NfcCommand command = NfcCommandContinue;
-
-    furi_assert(instance->state < FudanFm11rf005PollerStateNum);
 
     if(nfc_event->type == NfcEventTypePollerReady) {
-        command = fudan_fm11rf005_poller_state_handlers[instance->state](instance);
+        FudanFm11rf005Error error = fudan_fm11rf005_poller_activate(instance, instance->data);
+        if(error == FudanFm11rf005ErrorNone) {
+            instance->fudan_event.type = FudanFm11rf005PollerEventTypeSuccess;
+        } else {
+            instance->fudan_event.type = FudanFm11rf005PollerEventTypeError;
+            instance->fudan_event_data.error = error;
+        }
+        instance->callback(instance->general_event, instance->context);
+        return NfcCommandStop;
     }
 
-    return command;
+    return NfcCommandContinue;
 }
 
 static bool fudan_fm11rf005_poller_detect(NfcGenericEvent event, void* context) {
@@ -314,11 +200,13 @@ static bool fudan_fm11rf005_poller_detect(NfcGenericEvent event, void* context) 
     bool protocol_detected = false;
     FudanFm11rf005Poller* instance = context;
     NfcEvent* nfc_event = event.event_data;
-    furi_assert(instance->state == FudanFm11rf005PollerStateIdle);
 
     if(nfc_event->type == NfcEventTypePollerReady) {
         FudanFm11rf005Error error = fudan_fm11rf005_poller_activate(instance, instance->data);
-        protocol_detected = (error == FudanFm11rf005ErrorNone);
+        if(error == FudanFm11rf005ErrorNone) {
+            uint16_t atqa = instance->data->atqa;
+            protocol_detected = ((atqa & 0x0003) == 0x0003) || ((atqa & 0x0005) == 0x0005);
+        }
     }
 
     return protocol_detected;

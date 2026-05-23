@@ -9,7 +9,6 @@
 typedef struct {
     FuriThreadId thread_id;
     FudanFm11rf005Error error;
-    FudanFm11rf005Data* data;
 } FudanFm11rf005PollerSyncCtx;
 
 static NfcCommand fudan_fm11rf005_poller_sync_callback(NfcGenericEvent event, void* context) {
@@ -37,9 +36,7 @@ FudanFm11rf005Error
     FudanFm11rf005PollerSyncCtx poller_ctx = {
         .thread_id = furi_thread_get_current_id(),
         .error = FudanFm11rf005ErrorNone,
-        .data = data,
     };
-    poller_ctx.data = data;
 
     NfcPoller* poller = nfc_poller_alloc(nfc, NfcProtocolFudanFm11rf005);
     nfc_poller_start(poller, fudan_fm11rf005_poller_sync_callback, &poller_ctx);
