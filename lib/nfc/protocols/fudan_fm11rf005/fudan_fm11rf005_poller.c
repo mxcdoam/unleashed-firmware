@@ -5,8 +5,6 @@
 
 #include <furi.h>
 
-#define TAG "FudanPoller"
-
 const FudanFm11rf005Data* fudan_fm11rf005_poller_get_data(FudanFm11rf005Poller* instance) {
     furi_assert(instance);
     furi_assert(instance->data);
@@ -38,6 +36,9 @@ static FudanFm11rf005Poller* fudan_fm11rf005_poller_alloc(Nfc* nfc) {
 
 static void fudan_fm11rf005_poller_free(FudanFm11rf005Poller* instance) {
     furi_assert(instance);
+    furi_assert(instance->tx_buffer);
+    furi_assert(instance->rx_buffer);
+    furi_assert(instance->data);
 
     bit_buffer_free(instance->tx_buffer);
     bit_buffer_free(instance->rx_buffer);
@@ -105,7 +106,7 @@ FudanFm11rf005Error fudan_fm11rf005_poller_frame_exchange(
     return ret;
 }
 
-FudanFm11rf005Error
+static FudanFm11rf005Error
     fudan_fm11rf005_poller_activate(FudanFm11rf005Poller* instance, FudanFm11rf005Data* data) {
     furi_assert(instance);
     furi_assert(data);
@@ -134,14 +135,12 @@ FudanFm11rf005Error
     bit_buffer_copy_bytes(instance->tx_buffer, sel_cmd, sizeof(sel_cmd));
     iso14443_crc_append(Iso14443CrcTypeA, instance->tx_buffer);
 
-    //FURI_LOG_D(TAG, "SELECT: sending 0x93 + CRC via custom_parity");
     NfcError nfc_err = nfc_iso14443a_poller_trx_custom_parity(
         instance->nfc, instance->tx_buffer, instance->rx_buffer, FUDAN_FM11RF005_FDT_POLL_FC);
 
     data->sak = 0;
     if(nfc_err == NfcErrorNone && bit_buffer_get_size_bytes(instance->rx_buffer) >= 1) {
         data->sak = bit_buffer_get_byte(instance->rx_buffer, 0);
-        //FURI_LOG_D(TAG, "SELECT: rx SAK=0x%02X", data->sak);
     }
 
     for(uint8_t i = 0; i < FUDAN_FM11RF005_PAGE_NUM; i++) {

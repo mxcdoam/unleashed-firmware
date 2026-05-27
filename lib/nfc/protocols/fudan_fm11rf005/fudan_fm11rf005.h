@@ -56,8 +56,6 @@ void fudan_fm11rf005_reset(FudanFm11rf005Data* data);
 
 void fudan_fm11rf005_copy(FudanFm11rf005Data* dest, const FudanFm11rf005Data* src);
 
-bool fudan_fm11rf005_verify(const FudanFm11rf005Data* data, const FuriString* device_type);
-
 bool fudan_fm11rf005_load(FudanFm11rf005Data* data, FlipperFormat* ff, uint32_t version);
 
 bool fudan_fm11rf005_save(const FudanFm11rf005Data* data, FlipperFormat* ff);

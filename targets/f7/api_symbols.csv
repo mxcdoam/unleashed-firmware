@@ -1,5 +1,5 @@
 entry,status,name,type,params
-Version,+,87.8,,
+Version,+,88.0,,
 Header,+,applications/drivers/subghz/cc1101_ext/cc1101_ext_interconnect.h,,
 Header,+,applications/services/applications.h,,
 Header,+,applications/services/bt/bt_service/bt.h,,
@@ -1351,13 +1351,10 @@ Function,+,fudan_fm11rf005_get_type_from_atqa_sak,FudanFm11rf005Type,"uint16_t, 
 Function,+,fudan_fm11rf005_get_uid,const uint8_t*,"const FudanFm11rf005Data*, size_t*"
 Function,+,fudan_fm11rf005_is_equal,_Bool,"const FudanFm11rf005Data*, const FudanFm11rf005Data*"
 Function,+,fudan_fm11rf005_load,_Bool,"FudanFm11rf005Data*, FlipperFormat*, uint32_t"
-Function,+,fudan_fm11rf005_poller_activate,FudanFm11rf005Error,"FudanFm11rf005Poller*, FudanFm11rf005Data*"
-Function,-,fudan_fm11rf005_poller_read_page,FudanFm11rf005Error,"FudanFm11rf005Poller*, uint8_t, uint8_t*"
 Function,+,fudan_fm11rf005_poller_sync_read_all,FudanFm11rf005Error,"Nfc*, FudanFm11rf005Data*"
 Function,+,fudan_fm11rf005_reset,void,FudanFm11rf005Data*
 Function,+,fudan_fm11rf005_save,_Bool,"const FudanFm11rf005Data*, FlipperFormat*"
 Function,+,fudan_fm11rf005_set_uid,_Bool,"FudanFm11rf005Data*, const uint8_t*, size_t"
-Function,+,fudan_fm11rf005_verify,_Bool,"const FudanFm11rf005Data*, const FuriString*"
 Function,-,funlockfile,void,FILE*
 Function,-,funopen,FILE*,"const void*, int (*)(void*, char*, int), int (*)(void*, const char*, int), fpos_t (*)(void*, fpos_t, int), int (*)(void*)"
 Function,-,furi_background,void,

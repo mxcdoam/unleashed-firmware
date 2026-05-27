@@ -4,11 +4,10 @@
 #include <flipper_format.h>
 #include <nfc/nfc_common.h>
 
-#define FUDAN_PROTOCOL_NAME "FudanFM11RF005"
-#define FUDAN_TYPE_KEY      "Fudan Type"
+#define FUDAN_PROTOCOL_NAME "Fudan"
+#define FUDAN_TYPE_KEY      "Type"
 #define FUDAN_ATQA_KEY      "ATQA"
 #define FUDAN_SAK_KEY       "SAK"
-#define FUDAN_PAGE_KEY      "Page %d"
 
 const NfcDeviceBase nfc_device_fudan_fm11rf005 = {
     .protocol_name = FUDAN_PROTOCOL_NAME,
@@ -47,18 +46,13 @@ void fudan_fm11rf005_copy(FudanFm11rf005Data* dest, const FudanFm11rf005Data* sr
     *dest = *src;
 }
 
-bool fudan_fm11rf005_verify(const FudanFm11rf005Data* data, const FuriString* device_type) {
-    UNUSED(data);
-    furi_check(device_type);
-    return furi_string_equal_str(device_type, FUDAN_PROTOCOL_NAME);
-}
-
 FudanFm11rf005Type fudan_fm11rf005_get_type_from_atqa_sak(uint16_t atqa, uint8_t sak) {
-    if(sak == 0x0A && atqa == 0x0003) return FudanFm11rf005TypeFM11RF005SH;
-    if(sak == 0x0A && atqa == 0x0005)
-        return FudanFm11rf005TypeFM11RF005;
-    else
-        return FudanFm11rf005TypeUnknown;
+    if((sak & 0x0A) == 0x0A) {
+        if((atqa & 0x0003) == 0x0003) return FudanFm11rf005TypeFM11RF005SH;
+        if((atqa & 0x0005) == 0x0005) return FudanFm11rf005TypeFM11RF005;
+    }
+    if((sak & 0x53) == 0x53) return FudanFm11rf005TypeFM11RF005;
+    return FudanFm11rf005TypeUnknown;
 }
 
 bool fudan_fm11rf005_load(FudanFm11rf005Data* data, FlipperFormat* ff, uint32_t version) {
@@ -69,7 +63,7 @@ bool fudan_fm11rf005_load(FudanFm11rf005Data* data, FlipperFormat* ff, uint32_t 
     do {
         if(version < NFC_UNIFIED_FORMAT_VERSION) break;
 
-        if(!flipper_format_read_hex(ff, "UID", data->pages[1], FUDAN_FM11RF005_UID_SIZE)) break;
+        if(!flipper_format_read_hex(ff, "UID", data->uid, FUDAN_FM11RF005_UID_SIZE)) break;
         if(!flipper_format_read_hex(ff, "Pages", (uint8_t*)data->pages, FUDAN_FM11RF005_DATA_SIZE))
             break;
         if(!flipper_format_read_hex(
@@ -93,7 +87,7 @@ bool fudan_fm11rf005_save(const FudanFm11rf005Data* data, FlipperFormat* ff) {
 
     do {
         if(!flipper_format_write_comment_cstr(ff, FUDAN_PROTOCOL_NAME " specific data")) break;
-        if(!flipper_format_write_hex(ff, "UID", data->pages[1], FUDAN_FM11RF005_UID_SIZE)) break;
+        if(!flipper_format_write_hex(ff, "UID", data->uid, FUDAN_FM11RF005_UID_SIZE)) break;
         if(!flipper_format_write_hex(
                ff, "Pages", (const uint8_t*)data->pages, FUDAN_FM11RF005_DATA_SIZE))
             break;
@@ -120,11 +114,11 @@ const char* fudan_fm11rf005_get_name(const FudanFm11rf005Data* data, NfcDeviceNa
 
     if(name_type == NfcDeviceNameTypeFull) {
         if(data->type == FudanFm11rf005TypeFM11RF005) {
-            return "Fudan FM11RF005";
+            return "Fudan 005";
         } else if(data->type == FudanFm11rf005TypeFM11RF005SH) {
-            return "Fudan FM11RF005SH";
+            return "Fudan 005SH";
         }
-        return "Fudan FM11RF005 (Unknown)";
+        return "Fudan ???";
     }
 
     return FUDAN_PROTOCOL_NAME;
@@ -152,6 +146,5 @@ bool fudan_fm11rf005_set_uid(FudanFm11rf005Data* data, const uint8_t* uid, size_
 
 FudanFm11rf005Data* fudan_fm11rf005_get_base_data(const FudanFm11rf005Data* data) {
     UNUSED(data);
-    furi_crash("No base data for Fudan FM11RF005");
     return NULL;
 }

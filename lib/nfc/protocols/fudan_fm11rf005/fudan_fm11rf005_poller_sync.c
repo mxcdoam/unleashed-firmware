@@ -2,8 +2,6 @@
 #include "fudan_fm11rf005_poller_i.h"
 
 #include <furi.h>
-
-#define TAG "FudanPollerSync"
 #define FUDAN_POLLER_FLAG_CMD_COMPLETE (1UL << 0)
 
 typedef struct {
@@ -28,8 +26,7 @@ static NfcCommand fudan_fm11rf005_poller_sync_callback(NfcGenericEvent event, vo
     return NfcCommandStop;
 }
 
-FudanFm11rf005Error
-    fudan_fm11rf005_poller_sync_read_all(Nfc* nfc, FudanFm11rf005Data* data) {
+FudanFm11rf005Error fudan_fm11rf005_poller_sync_read_all(Nfc* nfc, FudanFm11rf005Data* data) {
     furi_assert(nfc);
     furi_assert(data);
 
@@ -41,8 +38,8 @@ FudanFm11rf005Error
     NfcPoller* poller = nfc_poller_alloc(nfc, NfcProtocolFudanFm11rf005);
     nfc_poller_start(poller, fudan_fm11rf005_poller_sync_callback, &poller_ctx);
 
-    uint32_t flags = furi_thread_flags_wait(
-        FUDAN_POLLER_FLAG_CMD_COMPLETE, FuriFlagWaitAny, FuriWaitForever);
+    uint32_t flags =
+        furi_thread_flags_wait(FUDAN_POLLER_FLAG_CMD_COMPLETE, FuriFlagWaitAny, FuriWaitForever);
     if(flags & FUDAN_POLLER_FLAG_CMD_COMPLETE) {
         nfc_poller_stop(poller);
     }

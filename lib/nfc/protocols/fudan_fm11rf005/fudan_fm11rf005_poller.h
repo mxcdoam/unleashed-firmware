@@ -25,12 +25,6 @@ typedef struct {
     FudanFm11rf005PollerEventData* data;
 } FudanFm11rf005PollerEvent;
 
-FudanFm11rf005Error
-    fudan_fm11rf005_poller_activate(FudanFm11rf005Poller* instance, FudanFm11rf005Data* data);
-
-FudanFm11rf005Error
-    fudan_fm11rf005_poller_read_page(FudanFm11rf005Poller* instance, uint8_t page, uint8_t* data);
-
 #ifdef __cplusplus
 }
 #endif
