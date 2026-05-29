@@ -6,21 +6,21 @@
 extern "C" {
 #endif
 
-#define FUDAN_FM11RF005_UID_SIZE          (4U)
-#define FUDAN_FM11RF005_PAGE_SIZE         (4U)
-#define FUDAN_FM11RF005_PAGE_NUM          (16U)
-#define FUDAN_FM11RF005_CARD_SIZE         (FUDAN_FM11RF005_PAGE_NUM * FUDAN_FM11RF005_PAGE_SIZE)
-#define FUDAN_FM11RF005_CID_SIZE          (2U)
-#define FUDAN_FM11RF005_MID_SIZE          (2U)
-#define FUDAN_FM11RF005_KEY_SIZE          (6U)
+#define FUDAN_FM11RF005_UID_SIZE (4U)
+#define FUDAN_FM11RF005_PAGE_SIZE (4U)
+#define FUDAN_FM11RF005_PAGE_NUM (16U)
+#define FUDAN_FM11RF005_CARD_SIZE (FUDAN_FM11RF005_PAGE_NUM * FUDAN_FM11RF005_PAGE_SIZE)
+#define FUDAN_FM11RF005_CID_SIZE (2U)
+#define FUDAN_FM11RF005_MID_SIZE (2U)
+#define FUDAN_FM11RF005_KEY_SIZE (6U)
 #define FUDAN_FM11RF005_READABLE_PAGE_NUM (8U)
-#define FUDAN_FM11RF005_DATA_SIZE         (FUDAN_FM11RF005_PAGE_NUM * FUDAN_FM11RF005_PAGE_SIZE)
+#define FUDAN_FM11RF005_DATA_SIZE (FUDAN_FM11RF005_PAGE_NUM * FUDAN_FM11RF005_PAGE_SIZE)
 
-#define FUDAN_FM11RF005_CMD_READ  (0x30U)
+#define FUDAN_FM11RF005_CMD_READ (0x30U)
 #define FUDAN_FM11RF005_CMD_WRITE (0xA0U)
 
-#define FUDAN_FM11RF005_FDT_POLL_FC      (6000U)
-#define FUDAN_FM11RF005_GUARD_TIME_US    (5000U)
+#define FUDAN_FM11RF005_FDT_POLL_FC (6000U)
+#define FUDAN_FM11RF005_GUARD_TIME_US (5000U)
 #define FUDAN_FM11RF005_POLL_POLL_MIN_US (1280U)
 
 typedef enum {
@@ -62,7 +62,8 @@ bool fudan_fm11rf005_save(const FudanFm11rf005Data* data, FlipperFormat* ff);
 
 bool fudan_fm11rf005_is_equal(const FudanFm11rf005Data* data, const FudanFm11rf005Data* other);
 
-const char* fudan_fm11rf005_get_name(const FudanFm11rf005Data* data, NfcDeviceNameType name_type);
+const char*
+    fudan_fm11rf005_get_name(const FudanFm11rf005Data* data, NfcDeviceNameType name_type);
 
 const uint8_t* fudan_fm11rf005_get_uid(const FudanFm11rf005Data* data, size_t* uid_len);
 

@@ -24,12 +24,6 @@ struct FudanFm11rf005Poller {
 
 const FudanFm11rf005Data* fudan_fm11rf005_poller_get_data(FudanFm11rf005Poller* instance);
 
-FudanFm11rf005Error fudan_fm11rf005_poller_frame_exchange(
-    FudanFm11rf005Poller* instance,
-    const BitBuffer* tx_buffer,
-    BitBuffer* rx_buffer,
-    uint32_t fwt);
-
 #ifdef __cplusplus
 }
 #endif

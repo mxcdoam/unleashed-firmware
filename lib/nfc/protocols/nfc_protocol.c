@@ -53,7 +53,6 @@ typedef struct {
 static const NfcProtocol nfc_protocol_iso14443_3a_children_protocol[] = {
     NfcProtocolIso14443_4a,
     NfcProtocolMfUltralight,
-    NfcProtocolFudanFm11rf005,
 };
 
 /** List of ISO14443-3B child protocols. */

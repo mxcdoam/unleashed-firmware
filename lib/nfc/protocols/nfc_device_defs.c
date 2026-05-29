@@ -51,6 +51,6 @@ const NfcDeviceBase* const nfc_devices[NfcProtocolNum] = {
     [NfcProtocolNtag4xx] = &nfc_device_ntag4xx,
     [NfcProtocolType4Tag] = &nfc_device_type_4_tag,
     [NfcProtocolEmv] = &nfc_device_emv,
-    [NfcProtocolFudanFm11rf005] = &nfc_device_fudan_fm11rf005,
+    [NfcProtocolFudanFm11rf005] = &nfc_device_fudan_fm11rf005
     /* Add new protocols here */
 };
