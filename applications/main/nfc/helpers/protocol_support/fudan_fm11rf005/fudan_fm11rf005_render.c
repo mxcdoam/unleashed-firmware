@@ -23,7 +23,7 @@ void nfc_render_fudan_fm11rf005_info(
             data->pages[0][2],
             data->pages[0][3]);
 
-        furi_string_cat_printf(str, "\n-------------[Pages]-------------");
+        furi_string_cat_printf(str, "\n------[Pages]------");
         for(size_t i = 0; i < FUDAN_FM11RF005_PAGE_NUM; i++) {
             furi_string_cat_printf(
                 str,

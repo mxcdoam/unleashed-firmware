@@ -336,6 +336,15 @@ App(
 )
 
 App(
+    appid="shmrt_parser",
+    apptype=FlipperAppType.PLUGIN,
+    entry_point="shmrt_plugin_ep",
+    targets=["f7"],
+    requires=["nfc"],
+    sources=["plugins/supported_cards/shmrt.c"],
+)
+
+App(
     appid="sev_tk_parser",
     apptype=FlipperAppType.PLUGIN,
     entry_point="sev_tk_plugin_ep",
