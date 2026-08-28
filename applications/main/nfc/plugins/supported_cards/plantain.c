@@ -643,6 +643,15 @@ static bool plantain_verify_type(Nfc* nfc, MfClassicType type) {
             break;
         }
 
+        // Sec12 key A = 0xacffffffffff is unique to plantain; reject CNCS cards that share sec8 key
+        const uint8_t sec12_block = mf_classic_get_first_block_num_of_sector(12);
+        bit_lib_num_to_bytes_be(cfg.keys[12].a, COUNT_OF(key.data), key.data);
+        error =
+            mf_classic_poller_sync_auth(nfc, sec12_block, &key, MfClassicKeyTypeA, &auth_context);
+        if(error != MfClassicErrorNone) {
+            break;
+        }
+
         verified = true;
     } while(false);
 
