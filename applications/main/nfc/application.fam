@@ -381,6 +381,81 @@ App(
 )
 
 App(
+    appid="bepk_parser",
+    apptype=FlipperAppType.PLUGIN,
+    entry_point="bepk_plugin_ep",
+    targets=["f7"],
+    requires=["nfc"],
+    sources=["plugins/supported_cards/bepk.c"],
+    fap_exclude_libs=["gcc"],
+)
+
+App(
+    appid="cncs_stdnt_parser",
+    apptype=FlipperAppType.PLUGIN,
+    entry_point="cncs_stdnt_plugin_ep",
+    targets=["f7"],
+    requires=["nfc"],
+    sources=[
+        "plugins/supported_cards/cncs_stdnt.c",
+        "api/elsy/elsytools.c",
+    ],
+    fap_exclude_libs=["gcc"],
+)
+
+App(
+    appid="cncs_school_parser",
+    apptype=FlipperAppType.PLUGIN,
+    entry_point="cncs_school_plugin_ep",
+    targets=["f7"],
+    requires=["nfc"],
+    sources=[
+        "plugins/supported_cards/cncs_school.c",
+        "api/elsy/elsytools.c",
+    ],
+    fap_exclude_libs=["gcc"],
+)
+
+App(
+    appid="cncs_dsbld_parser",
+    apptype=FlipperAppType.PLUGIN,
+    entry_point="cncs_dsbld_plugin_ep",
+    targets=["f7"],
+    requires=["nfc"],
+    sources=[
+        "plugins/supported_cards/cncs_dsbld.c",
+        "api/elsy/elsytools.c",
+    ],
+    fap_exclude_libs=["gcc"],
+)
+
+App(
+    appid="cncs_pension_parser",
+    apptype=FlipperAppType.PLUGIN,
+    entry_point="cncs_pension_plugin_ep",
+    targets=["f7"],
+    requires=["nfc"],
+    sources=[
+        "plugins/supported_cards/cncs_pension.c",
+        "api/elsy/elsytools.c",
+    ],
+    fap_exclude_libs=["gcc"],
+)
+
+App(
+    appid="cncs_free_parser",
+    apptype=FlipperAppType.PLUGIN,
+    entry_point="cncs_free_plugin_ep",
+    targets=["f7"],
+    requires=["nfc"],
+    sources=[
+        "plugins/supported_cards/cncs_free.c",
+        "api/elsy/elsytools.c",
+    ],
+    fap_exclude_libs=["gcc"],
+)
+
+App(
     appid="szppk_so_parser",
     apptype=FlipperAppType.PLUGIN,
     entry_point="szppk_so_plugin_ep",
@@ -397,6 +472,16 @@ App(
     targets=["f7"],
     requires=["nfc"],
     sources=["plugins/supported_cards/sk_tk.c"],
+    fap_exclude_libs=["gcc"],
+)
+
+App(
+    appid="kppk39_parser",
+    apptype=FlipperAppType.PLUGIN,
+    entry_point="kppk_plugin_ep",
+    targets=["f7"],
+    requires=["nfc"],
+    sources=["plugins/supported_cards/kppk39.c"],
     fap_exclude_libs=["gcc"],
 )
 
