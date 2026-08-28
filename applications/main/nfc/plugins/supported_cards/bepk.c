@@ -111,19 +111,28 @@ static bool auth_and_check_data(Nfc* nfc) {
 
     MfClassicKeyType key_type = MfClassicKeyTypeA;
     MfClassicKey mf_key;
+    // Auth sector 8 (first block = 32) with its own key A. Block 8 would target sector 2,
+    // whose key differs (0x2aba9519f574), so it would never authenticate on a real card.
     bit_lib_num_to_bytes_be(bepk_v1[8].a, sizeof(MfClassicKey), mf_key.data);
-    if(mf_classic_poller_sync_auth(nfc, 8, &mf_key, key_type, NULL) != MfClassicErrorNone)
+    if(mf_classic_poller_sync_auth(nfc, 32, &mf_key, key_type, NULL) != MfClassicErrorNone)
         return false;
 
     if(mf_classic_poller_sync_read_block(nfc, 34, &mf_key, key_type, &block_data) !=
        MfClassicErrorNone)
         return false;
 
-    if(block_data.data[1] > 16) return false;
-    if(block_data.data[2] < 1 || block_data.data[2] > 12) return false;
-    if(block_data.data[3] < 1 || block_data.data[3] > 31) return false;
-    if(block_data.data[4] > 23) return false;
-    if(block_data.data[5] > 59) return false;
+    // Block 34 holds the last metro-use timestamp. It can be entirely zeroed on cards
+    // that have never been used in the metro, so accept an empty record and only validate
+    // the fields when a timestamp is actually present (month/day non-zero).
+    const bool has_metro_use =
+        block_data.data[2] != 0 || block_data.data[3] != 0;
+    if(has_metro_use) {
+        if(block_data.data[1] > 16) return false;
+        if(block_data.data[2] < 1 || block_data.data[2] > 12) return false;
+        if(block_data.data[3] < 1 || block_data.data[3] > 31) return false;
+        if(block_data.data[4] > 23) return false;
+        if(block_data.data[5] > 59) return false;
+    }
 
     bit_lib_num_to_bytes_be(bepk_v1[15].a, sizeof(MfClassicKey), mf_key.data);
     if(mf_classic_poller_sync_auth(nfc, 60, &mf_key, key_type, NULL) != MfClassicErrorNone) {
@@ -210,25 +219,32 @@ static bool bepk_parse(const NfcDevice* device, FuriString* parsed_data) {
         bit_lib_bytes_to_num_be(sec_tr->key_a.data, COUNT_OF(sec_tr->key_a.data));
     if(key_a != bepk_v1[8].a) return false;
 
-    // Verify BEPK identity: sec0 = 0xa0a1a2a3a4a5 (v1-v3) or sec2 = 0x2aba9519f574 (v1,v2,v4)
-    const MfClassicSectorTrailer* sec_tr0 = mf_classic_get_sector_trailer_by_sector(data, 0);
-    const uint64_t key_a_0 =
-        bit_lib_bytes_to_num_be(sec_tr0->key_a.data, COUNT_OF(sec_tr0->key_a.data));
+    // BEPK identity: sec2 = 0x2aba9519f574 (v1/v2/v4) or, for v3 cards that default to
+    // sec15 = 0xa0a1a2a3a4a5, the combination sec2 = sec15 = 0xa0a1a2a3a4a5 with sec3 = all-FF.
+    // Student/school cards share sec8 but use a different key layout (sec2 = 0xa0a1.. with
+    // sec3 = 0xa0a1.., or other keys), so requiring these BEPK markers keeps them rejected.
     const MfClassicSectorTrailer* sec_tr2 = mf_classic_get_sector_trailer_by_sector(data, 2);
     const uint64_t key_a_2 =
         bit_lib_bytes_to_num_be(sec_tr2->key_a.data, COUNT_OF(sec_tr2->key_a.data));
-    if(key_a_0 != 0xa0a1a2a3a4a5 && key_a_2 != 0x2aba9519f574) return false;
-
-    // Reject student cards: sector 15 key A differs between card types
+    const MfClassicSectorTrailer* sec_tr3 = mf_classic_get_sector_trailer_by_sector(data, 3);
+    const uint64_t key_a_3 =
+        bit_lib_bytes_to_num_be(sec_tr3->key_a.data, COUNT_OF(sec_tr3->key_a.data));
     const MfClassicSectorTrailer* sec_tr15 = mf_classic_get_sector_trailer_by_sector(data, 15);
     const uint64_t key_a_15 =
         bit_lib_bytes_to_num_be(sec_tr15->key_a.data, COUNT_OF(sec_tr15->key_a.data));
-    if(key_a_15 == 0xa0a1a2a3a4a5 || key_a_15 == 0x3b21c684392e) return false;
 
-    if(data->block[34].data[2] < 1 || data->block[34].data[2] > 12) return false;
-    if(data->block[34].data[3] < 1 || data->block[34].data[3] > 31) return false;
-    if(data->block[34].data[4] > 23) return false;
-    if(data->block[34].data[5] > 59) return false;
+    const bool is_bepk_v2 =
+        key_a_2 == 0x2aba9519f574 && key_a_15 != 0x3b21c684392e;
+    const bool is_bepk_v3 =
+        key_a_2 == 0xa0a1a2a3a4a5 && key_a_3 == 0xffffffffffff && key_a_15 == 0xa0a1a2a3a4a5;
+    if(!is_bepk_v2 && !is_bepk_v3) return false;
+
+    if(data->block[34].data[2] != 0 || data->block[34].data[3] != 0) {
+        if(data->block[34].data[2] < 1 || data->block[34].data[2] > 12) return false;
+        if(data->block[34].data[3] < 1 || data->block[34].data[3] > 31) return false;
+        if(data->block[34].data[4] > 23) return false;
+        if(data->block[34].data[5] > 59) return false;
+    }
 
     for(uint8_t i = 0; i < 4; i++) {
         ticket_data.card_number = ticket_data.card_number << 8 | data->block[0].data[3 - i];
