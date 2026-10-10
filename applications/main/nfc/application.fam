@@ -495,12 +495,6 @@ App(
     targets=["f7"],
     requires=["nfc"],
     sources=["plugins/supported_cards/shmrt.c"],
-    appid="kppk39_parser",
-    apptype=FlipperAppType.PLUGIN,
-    entry_point="kppk_plugin_ep",
-    targets=["f7"],
-    requires=["nfc"],
-    sources=["plugins/supported_cards/kppk39.c"],
     fap_exclude_libs=["gcc"],
 )
 
@@ -882,5 +876,16 @@ App(
     targets=["f7"],
     requires=["nfc"],
     sources=["plugins/supported_cards/aic.c"],
+    fap_exclude_libs=["gcc"],
+)
+
+
+App(
+    appid="kppk39_parser",
+    apptype=FlipperAppType.PLUGIN,
+    entry_point="kppk39_plugin_ep",
+    targets=["f7"],
+    requires=["nfc"],
+    sources=["plugins/supported_cards/kppk39.c"],
     fap_exclude_libs=["gcc"],
 )
