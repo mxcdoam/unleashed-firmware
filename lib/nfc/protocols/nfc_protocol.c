@@ -14,9 +14,9 @@
  *
  *                                                  (Start)
  *                                                     |
- *                            +------------------------+-----------+---------+------------+-----------------+
- *                            |                        |           |         |            |                 |
- *                       ISO14443-3A              ISO14443-3B    Felica  ISO15693-3    ST25TB           FM11RF005
+ *                            +------------------------+-----------+---------+------------+-----------------+--------+
+ *                            |                        |           |         |            |                 |        |
+ *                       ISO14443-3A              ISO14443-3B    Felica  ISO15693-3    ST25TB           FM11RF005   Texkom
  *                            |                        |                     |
  *            +---------------+-------------+     ISO14443-4B              SLIX
  *            |               |             |
@@ -183,6 +183,12 @@ static const NfcProtocolTreeNode nfc_protocol_nodes[NfcProtocolNum] = {
             .children_protocol = NULL,
         },
 
+    [NfcProtocolTexkom] =
+        {
+            .parent_protocol = NfcProtocolInvalid,
+            .children_num = 0,
+            .children_protocol = NULL,
+        },
     /* Add new protocols here */
 };
 
