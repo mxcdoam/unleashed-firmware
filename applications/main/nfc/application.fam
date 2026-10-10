@@ -883,7 +883,7 @@ App(
 App(
     appid="kppk39_parser",
     apptype=FlipperAppType.PLUGIN,
-    entry_point="kppk39_plugin_ep",
+    entry_point="kppk_plugin_ep",
     targets=["f7"],
     requires=["nfc"],
     sources=["plugins/supported_cards/kppk39.c"],
