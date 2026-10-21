@@ -37,7 +37,7 @@
 #include <lfrfid/lfrfid_worker.h>
 
 #include <lfrfid/scenes/lfrfid_scene.h>
-#include <lfrfid/lfrfid_manual_format.h>
+#include "helpers/lfrfid_manual_format.h"
 
 #define LFRFID_KEY_NAME_SIZE   22
 #define LFRFID_TEXT_STORE_SIZE 40
@@ -48,8 +48,9 @@
 #define LFRFID_APP_FILENAME_EXTENSION        ".rfid"
 #define LFRFID_APP_SHADOW_FILENAME_EXTENSION ".shd"
 
-#define LFRFID_APP_RAW_ASK_EXTENSION ".ask.raw"
-#define LFRFID_APP_RAW_PSK_EXTENSION ".psk.raw"
+#define LFRFID_APP_RAW_ASK_EXTENSION    ".ask.raw"
+#define LFRFID_APP_RAW_PSK_EXTENSION    ".psk.raw"
+#define LFRFID_APP_RAW_ASK134_EXTENSION ".ask134.raw"
 
 enum LfRfidCustomEvent {
     LfRfidEventNext = 100,
@@ -61,15 +62,21 @@ enum LfRfidCustomEvent {
     LfRfidEventReadSenseCardEnd,
     LfRfidEventReadStartASK,
     LfRfidEventReadStartPSK,
+    LfRfidEventReadStartASK134,
     LfRfidEventReadDone,
     LfRfidEventReadOverrun,
     LfRfidEventReadError,
-    LfRfidEventWipeProgress,
     LfRfidEventWriteOK,
     LfRfidEventWriteProtocolCannotBeWritten,
     LfRfidEventWriteNoEnabledTarget,
     LfRfidEventWriteFobCannotBeWritten,
     LfRfidEventWriteTooLongToWrite,
+    LfRfidEventWriteCannotRead,
+    LfRfidEventWriteAlreadyProtected,
+    LfRfidEventWriteKeyNotStored,
+    LfRfidEventWritePasswordNotStored,
+    LfRfidEventWriteProtectionRefused,
+    LfRfidEventWriteProtectionUnchecked,
     LfRfidEventWriteProgress,
     LfRfidEventRpcLoadFile,
     LfRfidEventRpcSessionClose,
@@ -172,5 +179,3 @@ void lfrfid_popup_timeout_callback(void* context);
 void lfrfid_widget_callback(GuiButtonType result, InputType type, void* context);
 
 void lfrfid_text_input_callback(void* context);
-
-const uint32_t* lfrfid_get_t5577_default_passwords(uint8_t* len);
