@@ -38,6 +38,10 @@
 // test writes lives here, being scratch with no business in a list of saved keys, and so do the
 // dumps versions before this one saved - left where they are, and listed by the browser like
 // any other subfolder of the app folder.
+// This app's own folder inside it, which is not where the user's dumps go. The backup a block
+// test writes lives here, being scratch with no business in a list of saved keys, and so do the
+// dumps versions before this one saved - left where they are, and listed by the browser like
+// any other subfolder of the app folder.
 #define T5577_APP_OWN_FOLDER   EXT_PATH("lfrfid/t5577")
 #define T5577_APP_NAME_MAX     32
 #define T5577_APP_TEST_BACKUP  "T5577_before_test"
@@ -46,6 +50,7 @@
 #define T5577_APP_EDIT_BLOCKS  T5577_RESTORE_BLOCKS
 // The named fields of block 0, plus the word they add up to.
 #define T5577_APP_CONFIG_ITEMS 5
+#define T5577_APP_HEADER_MAX   18 // characters a header, or a line of dialog, has room for
 #define T5577_APP_HEADER_MAX   18 // characters a header, or a line of dialog, has room for
 // Blocks that would not read back before a read or a check gives up on the tag. A chip in
 // the field that answered once does not go quiet for a second and a half and come back, and
@@ -241,17 +246,6 @@ void t5577_app_forget_password(T5577App* app);
 
 /** The dump's filename, cut to what a header or a line of dialog text has room for. */
 void t5577_app_short_name(const T5577App* app, FuriString* name);
-
-/** Keep a password in the user's own list, and say what became of it.
- *
- * Both lists are asked, not just the one being written to: the shipped list holds a hundred-odd
- * words a cloner is likely to be using, so "already known" is the common answer and saying it is
- * more use than silently writing a duplicate.
- *
- * Shared by the sniff result's Save and the dictionary's Add so a word recovered off the air and
- * a word typed in get the same checks and the same four answers.
- */
-void t5577_app_dict_save(T5577App* app, uint32_t password);
 
 /** Say something and wait for OK. */
 void t5577_app_say(T5577App* app, const char* header, const char* text);
