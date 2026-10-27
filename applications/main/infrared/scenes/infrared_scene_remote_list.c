@@ -14,6 +14,11 @@ static void infrared_scene_remote_list_select_and_load(InfraredApp* infrared) {
     dialog_file_browser_set_basic_options(&browser_options, INFRARED_APP_EXTENSION, &I_ir_10px);
     browser_options.base_path = INFRARED_APP_FOLDER;
 
+    // Until a remote has been opened the path is empty, which the browser reads as /ext.
+    if(furi_string_empty(infrared->file_path)) {
+        furi_string_set(infrared->file_path, INFRARED_APP_FOLDER);
+    }
+
     const bool file_selected = dialog_file_browser_show(
         infrared->dialogs, infrared->file_path, infrared->file_path, &browser_options);
 
@@ -46,7 +51,7 @@ bool infrared_scene_remote_list_on_event(void* context, SceneManagerEvent event)
                 bool wrong_file_type =
                     INFRARED_ERROR_CHECK(task_error, InfraredErrorCodeWrongFileType);
                 const char* format = wrong_file_type ?
-                                         "Library file\n\"%s\" can't be openned as a remote" :
+                                         "Library file\n\"%s\" can't be opened as a remote" :
                                          "Failed to load\n\"%s\"";
 
                 infrared_show_error_message(

@@ -27,6 +27,8 @@ void lfrfid_scene_start_on_enter(void* context) {
         LfRfidMenuIndexExtraActions,
         lfrfid_scene_start_submenu_callback,
         app);
+    submenu_add_item(
+        submenu, "Settings", LfRfidMenuIndexSettings, lfrfid_scene_start_submenu_callback, app);
 
     submenu_set_selected_item(
         submenu, scene_manager_get_scene_state(app->scene_manager, LfRfidSceneStart));
@@ -50,12 +52,17 @@ bool lfrfid_scene_start_on_event(void* context, SceneManagerEvent event) {
             scene_manager_next_scene(app->scene_manager, LfRfidSceneRead);
             dolphin_deed(DolphinDeedRfidRead);
             consumed = true;
-        } else if(event.event == LfRfidMenuIndexSaved) {
+        } else if(event.event == LfRfidMenuIndexSaved || event.event == LfRfidEventBrowseSaved) {
             // Like in the other apps, explicitly save the scene state
             // in each branch in case the user cancels loading a file.
             scene_manager_set_scene_state(
                 app->scene_manager, LfRfidSceneStart, LfRfidMenuIndexSaved);
-            furi_string_set(app->file_path, LFRFID_APP_FOLDER);
+            // The browser opens on whatever file_path holds. A launch asking for the list has
+            // already pointed it at the file to land on - the "clear key" block above resets
+            // file_name and deliberately not file_path - so only the menu item sets the folder.
+            if(event.event == LfRfidMenuIndexSaved) {
+                furi_string_set(app->file_path, LFRFID_APP_FOLDER);
+            }
             scene_manager_next_scene(app->scene_manager, LfRfidSceneSelectKey);
             consumed = true;
         } else if(event.event == LfRfidMenuIndexAddManually) {
@@ -67,6 +74,11 @@ bool lfrfid_scene_start_on_event(void* context, SceneManagerEvent event) {
             scene_manager_set_scene_state(
                 app->scene_manager, LfRfidSceneStart, LfRfidMenuIndexExtraActions);
             scene_manager_next_scene(app->scene_manager, LfRfidSceneExtraActions);
+            consumed = true;
+        } else if(event.event == LfRfidMenuIndexSettings) {
+            scene_manager_set_scene_state(
+                app->scene_manager, LfRfidSceneStart, LfRfidMenuIndexSettings);
+            scene_manager_next_scene(app->scene_manager, LfRfidSceneSettings);
             consumed = true;
         }
     }

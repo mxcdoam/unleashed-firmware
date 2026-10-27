@@ -4,6 +4,7 @@
 #include "../blocks/encoder.h"
 #include "../blocks/generic.h"
 #include "../blocks/math.h"
+#include "common.h"
 #include "core/log.h"
 #include <stddef.h>
 #include <stdint.h>
@@ -14,6 +15,8 @@
 #define TAG "BenincaARC"
 
 #define BENINCA_ARC_KEY_TYPE 9u
+
+static uint8_t subghz_protocol_decoder_beninca_arc_get_hash_data(void* context);
 
 static const SubGhzBlockConst subghz_protocol_beninca_arc_const = {
     .te_short = 300,
@@ -36,6 +39,7 @@ struct SubGhzProtocolDecoderBenincaARC {
 
     SubGhzKeystore* keystore;
 };
+SUBGHZ_ASSERT_DECODER_COMMON_LAYOUT(SubGhzProtocolDecoderBenincaARC);
 
 struct SubGhzProtocolEncoderBenincaARC {
     SubGhzProtocolEncoderBase base;
@@ -45,27 +49,28 @@ struct SubGhzProtocolEncoderBenincaARC {
 
     SubGhzKeystore* keystore;
 };
+SUBGHZ_ASSERT_ENCODER_GENERIC_LAYOUT(SubGhzProtocolEncoderBenincaARC);
 
 const SubGhzProtocolDecoder subghz_protocol_beninca_arc_decoder = {
     .alloc = subghz_protocol_decoder_beninca_arc_alloc,
-    .free = subghz_protocol_decoder_beninca_arc_free,
+    .free = subghz_protocol_decoder_common_free,
 
     .feed = subghz_protocol_decoder_beninca_arc_feed,
-    .reset = subghz_protocol_decoder_beninca_arc_reset,
+    .reset = subghz_protocol_decoder_common_reset,
 
     .get_hash_data = subghz_protocol_decoder_beninca_arc_get_hash_data,
-    .serialize = subghz_protocol_decoder_beninca_arc_serialize,
+    .serialize = subghz_protocol_decoder_common_serialize_data_2,
     .deserialize = subghz_protocol_decoder_beninca_arc_deserialize,
     .get_string = subghz_protocol_decoder_beninca_arc_get_string,
 };
 
 const SubGhzProtocolEncoder subghz_protocol_beninca_arc_encoder = {
     .alloc = subghz_protocol_encoder_beninca_arc_alloc,
-    .free = subghz_protocol_encoder_beninca_arc_free,
+    .free = subghz_protocol_encoder_common_free,
 
     .deserialize = subghz_protocol_encoder_beninca_arc_deserialize,
-    .stop = subghz_protocol_encoder_beninca_arc_stop,
-    .yield = subghz_protocol_encoder_beninca_arc_yield,
+    .stop = subghz_protocol_encoder_common_stop,
+    .yield = subghz_protocol_encoder_common_yield,
 };
 
 const SubGhzProtocol subghz_protocol_beninca_arc = {
@@ -250,31 +255,10 @@ static void subghz_protocol_beninca_arc_encrypt(
 }
 
 void* subghz_protocol_encoder_beninca_arc_alloc(SubGhzEnvironment* environment) {
-    SubGhzProtocolEncoderBenincaARC* instance = malloc(sizeof(SubGhzProtocolEncoderBenincaARC));
-
-    instance->base.protocol = &subghz_protocol_beninca_arc;
-    instance->generic.protocol_name = instance->base.protocol->name;
+    SubGhzProtocolEncoderBenincaARC* instance = subghz_protocol_encoder_common_alloc(
+        sizeof(SubGhzProtocolEncoderBenincaARC), &subghz_protocol_beninca_arc, 1, 800);
     instance->keystore = subghz_environment_get_keystore(environment);
-
-    instance->encoder.repeat = 1;
-    instance->encoder.size_upload = 800;
-    instance->encoder.upload = malloc(instance->encoder.size_upload * sizeof(LevelDuration));
-    instance->encoder.is_running = false;
-
     return instance;
-}
-
-void subghz_protocol_encoder_beninca_arc_free(void* context) {
-    furi_assert(context);
-    SubGhzProtocolEncoderBenincaARC* instance = context;
-    free(instance->encoder.upload);
-    free(instance);
-}
-
-void subghz_protocol_encoder_beninca_arc_stop(void* context) {
-    furi_assert(context);
-    SubGhzProtocolEncoderBenincaARC* instance = context;
-    instance->encoder.is_running = false;
 }
 
 static void subghz_protocol_beninca_arc_encoder_get_upload(
@@ -386,21 +370,7 @@ bool subghz_protocol_beninca_arc_create_data(
     SubGhzProtocolStatus res =
         subghz_block_generic_serialize(&instance->generic, flipper_format, preset);
 
-    uint8_t key_data[sizeof(uint64_t)] = {0};
-    for(size_t i = 0; i < sizeof(uint64_t); i++) {
-        key_data[sizeof(uint64_t) - i - 1] = (instance->generic.data_2 >> (i * 8)) & 0xFF;
-    }
-
-    if(!flipper_format_rewind(flipper_format)) {
-        FURI_LOG_E(TAG, "Rewind error");
-        res = SubGhzProtocolStatusErrorParserOthers;
-    }
-
-    if((res == SubGhzProtocolStatusOk) &&
-       !flipper_format_insert_or_update_hex(flipper_format, "Data", key_data, sizeof(uint64_t))) {
-        FURI_LOG_E(TAG, "Unable to add Data2");
-        res = SubGhzProtocolStatusErrorParserOthers;
-    }
+    res = subghz_protocol_common_append_data_2(res, &instance->generic, flipper_format);
 
     return res == SubGhzProtocolStatusOk;
 }
@@ -470,44 +440,21 @@ SubGhzProtocolStatus
     return res;
 }
 
-LevelDuration subghz_protocol_encoder_beninca_arc_yield(void* context) {
-    furi_assert(context);
-    SubGhzProtocolEncoderBenincaARC* instance = context;
-
-    if(instance->encoder.repeat == 0 || !instance->encoder.is_running) {
-        instance->encoder.is_running = false;
-        return level_duration_reset();
-    }
-
-    LevelDuration ret = instance->encoder.upload[instance->encoder.front];
-
-    if(++instance->encoder.front == instance->encoder.size_upload) {
-        if(!subghz_block_generic_global.endless_tx) instance->encoder.repeat--;
-        instance->encoder.front = 0;
-    }
-
-    return ret;
-}
-
 void* subghz_protocol_decoder_beninca_arc_alloc(SubGhzEnvironment* environment) {
-    SubGhzProtocolDecoderBenincaARC* instance = malloc(sizeof(SubGhzProtocolDecoderBenincaARC));
-    instance->base.protocol = &subghz_protocol_beninca_arc;
-    instance->generic.protocol_name = instance->base.protocol->name;
+    SubGhzProtocolDecoderBenincaARC* instance = subghz_protocol_decoder_common_alloc(
+        sizeof(SubGhzProtocolDecoderBenincaARC), &subghz_protocol_beninca_arc);
     instance->keystore = subghz_environment_get_keystore(environment);
     instance->decoder.parser_step = BenincaARCDecoderStart;
     return instance;
 }
 
-void subghz_protocol_decoder_beninca_arc_free(void* context) {
+/* The mini counter rotates for as long as the button is held, so every parcel of one
+ * press is a different frame. Decode first and hash the serial instead. */
+static uint8_t subghz_protocol_decoder_beninca_arc_get_hash_data(void* context) {
     furi_assert(context);
     SubGhzProtocolDecoderBenincaARC* instance = context;
-    free(instance);
-}
-
-void subghz_protocol_decoder_beninca_arc_reset(void* context) {
-    furi_assert(context);
-    SubGhzProtocolDecoderBenincaARC* instance = context;
-    instance->decoder.parser_step = BenincaARCDecoderStart;
+    subghz_protocol_beninca_arc_decrypt(&instance->generic, instance->keystore);
+    return subghz_protocol_decoder_common_get_hash_data_serial(context);
 }
 
 void subghz_protocol_decoder_beninca_arc_feed(void* context, bool level, uint32_t duration) {
@@ -583,40 +530,6 @@ void subghz_protocol_decoder_beninca_arc_feed(void* context, bool level, uint32_
             break;
         }
     }
-}
-
-uint8_t subghz_protocol_decoder_beninca_arc_get_hash_data(void* context) {
-    furi_assert(context);
-    SubGhzProtocolDecoderBenincaARC* instance = context;
-    return subghz_protocol_blocks_get_hash_data(
-        &instance->decoder, (instance->decoder.decode_count_bit / 8) + 1);
-}
-
-SubGhzProtocolStatus subghz_protocol_decoder_beninca_arc_serialize(
-    void* context,
-    FlipperFormat* flipper_format,
-    SubGhzRadioPreset* preset) {
-    furi_assert(context);
-    SubGhzProtocolDecoderBenincaARC* instance = context;
-    SubGhzProtocolStatus ret =
-        subghz_block_generic_serialize(&instance->generic, flipper_format, preset);
-
-    uint8_t key_data[sizeof(uint64_t)] = {0};
-    for(size_t i = 0; i < sizeof(uint64_t); i++) {
-        key_data[sizeof(uint64_t) - i - 1] = (instance->generic.data_2 >> (i * 8)) & 0xFF;
-    }
-
-    if(!flipper_format_rewind(flipper_format)) {
-        FURI_LOG_E(TAG, "Rewind error");
-        ret = SubGhzProtocolStatusErrorParserOthers;
-    }
-
-    if((ret == SubGhzProtocolStatusOk) &&
-       !flipper_format_insert_or_update_hex(flipper_format, "Data", key_data, sizeof(uint64_t))) {
-        FURI_LOG_E(TAG, "Unable to add Data");
-        ret = SubGhzProtocolStatusErrorParserOthers;
-    }
-    return ret;
 }
 
 SubGhzProtocolStatus

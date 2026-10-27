@@ -155,15 +155,16 @@ static NfcCommand nfc_dict_attack_worker_callback(NfcGenericEvent event, void* c
         keys_dict_rewind(instance->nfc_dict_context.dict);
         instance->nfc_dict_context.dict_keys_current = 0;
 
-        // In CUID mode, increment the key index and calculate sector from it
         if(is_cuid_dict) {
             instance->nfc_dict_context.current_key_idx++;
             // Calculate sector from key_idx (each sector has 2 keys: A and B)
-            instance->nfc_dict_context.current_sector =
-                instance->nfc_dict_context.current_key_idx / 2;
-            // Write back to event data so poller can read it
-            mfc_event->data->next_sector_data.current_sector =
-                instance->nfc_dict_context.current_sector;
+            uint8_t next_sector = instance->nfc_dict_context.current_key_idx / 2;
+            // The poller adopts this as its cursor and ends the pass one past the last sector,
+            // so that marker is for it, not for the view.
+            mfc_event->data->next_sector_data.current_sector = next_sector;
+            if(next_sector < instance->nfc_dict_context.sectors_total) {
+                instance->nfc_dict_context.current_sector = next_sector;
+            }
         } else {
             instance->nfc_dict_context.current_sector =
                 mfc_event->data->next_sector_data.current_sector;
@@ -274,8 +275,18 @@ static void mf_classic_scene_dict_attack_prepare_view(NfcApp* instance) {
             memset(instance->nfc_dict_context.cuid_key_indices_bitmap, 0, 32);
 
             // Scan dictionary once to count keys and populate bitmap
+            // A failed size query reads as 0: keep the bare spinner rather than a bogus bar
+            const size_t dict_size = stream_size(dict->stream);
+
             uint8_t key_with_idx[dict->key_size];
             while(keys_dict_get_next_key(dict, key_with_idx, dict->key_size)) {
+                // Position from fixed-size lines: stream_tell is a storage round trip per key.
+                // Whole percents, so the view redraws at most 100 times.
+                if(dict_size) {
+                    const uint32_t percent =
+                        dict->total_keys * dict->key_size_symbols * 100 / dict_size;
+                    nfc_set_loading_label_progress(instance, MIN(percent, 100U) / 100.0f);
+                }
                 uint8_t key_idx = key_with_idx[0];
                 // Set bit for this key index
                 instance->nfc_dict_context.cuid_key_indices_bitmap[key_idx / 8] |=
@@ -349,6 +360,8 @@ static void mf_classic_scene_dict_attack_prepare_view(NfcApp* instance) {
     dict_attack_set_total_dict_keys(
         instance->dict_attack, instance->nfc_dict_context.dict_keys_total);
     instance->nfc_dict_context.dict_keys_current = 0;
+    // A phase reports no sector until it has cleared its first one, else the last one lingers.
+    instance->nfc_dict_context.current_sector = 0;
 
     dict_attack_set_callback(
         instance->dict_attack, nfc_dict_attack_dict_attack_result_callback, instance);
@@ -385,12 +398,15 @@ static void mf_classic_scene_dict_attack_on_enter(NfcApp* instance) {
     mf_classic_scene_dict_attack_start_poller(instance);
 }
 
+// Ask the device data, not the poller's: a Skip before activation leaves the poller empty, and the
+// phase that just ended took its dump with it.
+static bool mf_classic_scene_dict_attack_is_card_read(NfcApp* instance) {
+    return mf_classic_is_card_read(
+        nfc_device_get_data(instance->nfc_device, NfcProtocolMfClassic));
+}
+
 static void mf_classic_scene_dict_attack_notify_read(NfcApp* instance) {
-    // Grade the device data, not the poller's: a Skip before activation leaves the poller empty.
-    const MfClassicData* mfc_data =
-        nfc_device_get_data(instance->nfc_device, NfcProtocolMfClassic);
-    bool is_card_fully_read = mf_classic_is_card_read(mfc_data);
-    if(is_card_fully_read) {
+    if(mf_classic_scene_dict_attack_is_card_read(instance)) {
         notification_message(instance->notifications, &sequence_success);
     } else {
         notification_message(instance->notifications, &sequence_semi_success);
@@ -406,7 +422,9 @@ static bool mf_classic_scene_dict_attack_on_event(NfcApp* instance, SceneManager
         if(event.event == NfcCustomEventDictAttackComplete) {
             bool ran_nested_dict = instance->nfc_dict_context.nested_phase !=
                                    MfClassicNestedPhaseNone;
-            if(state == DictAttackStateCUIDDictInProgress) {
+            // A later phase on a solved card is a poller, a view and a dictionary spent on nothing.
+            bool card_read = mf_classic_scene_dict_attack_is_card_read(instance);
+            if(state == DictAttackStateCUIDDictInProgress && !card_read) {
                 nfc_poller_stop(instance->poller);
                 nfc_poller_free(instance->poller);
                 instance->poller = NULL;
@@ -422,7 +440,7 @@ static bool mf_classic_scene_dict_attack_on_event(NfcApp* instance, SceneManager
                 mf_classic_scene_dict_attack_prepare_view(instance);
                 mf_classic_scene_dict_attack_start_poller(instance);
                 consumed = true;
-            } else if(state == DictAttackStateUserDictInProgress && !(ran_nested_dict)) {
+            } else if(state == DictAttackStateUserDictInProgress && !(ran_nested_dict) && !card_read) {
                 nfc_poller_stop(instance->poller);
                 nfc_poller_free(instance->poller);
                 instance->poller = NULL;
@@ -459,8 +477,9 @@ static bool mf_classic_scene_dict_attack_on_event(NfcApp* instance, SceneManager
             }
             bool ran_nested_dict = instance->nfc_dict_context.nested_phase !=
                                    MfClassicNestedPhaseNone;
+            bool card_read = mf_classic_scene_dict_attack_is_card_read(instance);
             if(state == DictAttackStateCUIDDictInProgress) {
-                if(instance->nfc_dict_context.is_card_present) {
+                if(instance->nfc_dict_context.is_card_present && !card_read) {
                     nfc_poller_stop(instance->poller);
                     nfc_poller_free(instance->poller);
                     instance->poller = NULL;
@@ -482,7 +501,7 @@ static bool mf_classic_scene_dict_attack_on_event(NfcApp* instance, SceneManager
                 }
                 consumed = true;
             } else if(state == DictAttackStateUserDictInProgress && !(ran_nested_dict)) {
-                if(instance->nfc_dict_context.is_card_present) {
+                if(instance->nfc_dict_context.is_card_present && !card_read) {
                     nfc_poller_stop(instance->poller);
                     nfc_poller_free(instance->poller);
                     instance->poller = NULL;
