@@ -1,5 +1,8 @@
 ## Main changes
+<<<<<<< HEAD
 - Current API: 88.24
+- SubGHz: **KeeLoq remotes that send at half the usual rate (Te 200us) are now decoded, and sent back at the rate they were received at**
+- SubGHz: **Hormann HSM remotes whose frame starts with seven preamble ones instead of eight are now decoded**
 - SubGHz: **Nice O-Code remotes that send the longer 72bit frame now work, as `Nice O-Code One 433MHz` in Add Manually**
 - SubGHz: **Nice O-Code 112bit frames carrying the receiver certificate are decoded and sent, as `Nice O-Code+Crt 433MHz`**
 - SubGHz: **Nice O-Code shows the certificate as the receiver's own value, masked with each remote's serial only on air**
@@ -25,6 +28,7 @@
 - SubGHz Remote: **Fix rolling code and custom button resets after TX, and the counter moving twice per press**
 - Apps: **`SubGHz WarDriving` - RX restarts after TX, and sending a received dynamic signal no longer overwrites a saved file**
 - SubGHz: **KeeLoq `CounterMode: 7` now opens a Doorhan on the first press**
+- SubGHz: **KeeLoq `CounterMode` 7, 8 and 9 each reproduce a DoorHan Smart clone resync pack, one per board family** (what `CounterMode: 7` used to send is now mode 8)
 - SubGHz: **The read list is no longer capped at 55 signals, and Hold Right deletes one**
 - SubGHz: **`Delete old signals` makes room by memory now, for a send as well as a read**
 - SubGHz: **Send no longer crashes on a full list**
@@ -48,39 +52,28 @@
 - RFID: **Fix the T5577 app sending a password to a tag that never asked for one** (by @mishamyte | PR #1192)
 - RFID: **Fix the T5577 app ignoring Back while it looks for a tag** (by @mishamyte | PR #1192)
 - RFID: **T5577 `Sniff Password` says `Too much noise` instead of reporting silence when the coil itself chatters** (by @mishamyte | PR #1202)
+- RFID: **T5577 `Clear Password` shows the password that opened the tag, and offers to keep one you typed** (by @mishamyte | PR #1208)
+- RFID: **Fix the T5577 app saying `Not cleared` about a tag it had opened, on one flaked read** (by @mishamyte | PR #1208)
 - RFID: **T5577 app - a Test Tag backup is deleted once the tag is proven restored, and warns before overwriting one that survives** (by @mishamyte | PR #1179)
 - SubGHz: **Fix Marantec24 and Linear Delta 3 not decoding a signal the Flipper itself sends** (by @mishamyte | PR #1207 | Closes #1205)
 - SubGHz: **Fix Holtek HT12X reporting a key off one frame when the receiver had just been reset** (by @mishamyte | PR #1207)
-- Apps: Build tag (**4nov2026**) - **Check out more Apps updates and fixes by following** [this link](https://github.com/xMasterX/all-the-plugins/commits/dev)
+- SubGHz: **New KeeLoq manufacturer Phantom / Hiland - these remotes read and send properly, and `KL: Phantom/Hiland 433M` is in Add Manually**
+- SubGHz: **New protocol FAAC TM - the 12 dip switch TM 433/868 DS remotes, which CAME 12bit used to read as its own, with `FAAC TM 433MHz` and `FAAC TM 868MHz` in Add Manually**
+- SubGHz: **868.00 MHz is in the default frequency list**
+- iButton: **Cyfral and Metakom keys can be written to TM01x blanks** (by @Leptopt1los | PR #1209 | In OFW PR 4508)
+- Apps: Build tag (**6nov2026**) - **Check out more Apps updates and fixes by following** [this link](https://github.com/xMasterX/all-the-plugins/commits/dev)
 ## Other changes
-- SubGHz: **CAME TWEE no longer reads past the end of its decode table on a parcel counter of F**
-- SubGHz: **Fix encoder buffers too small for the keys Came Atomo, Somfy Keytis, Somfy Telis, Power Smart and Dooya accept**
-- SubGHz: **Nero Radio signals show the right static or rolling icon in the read list**
-- Apps: **`SubGHz WarDriving` - `Delete old signals` can no longer empty the whole list, and Send refuses instead of crashing**
-- Apps: **`Nice O-Code` and `Seed Capturer` say so instead of trying when a `.sub` file holds a key rather than a capture**
-- Apps: **Fix the loading spinner flashing when you close an app opened from `Apps`** (by @mishamyte | PR #1195 | Fixes #1178)
-- OFW: **Typos fixed in on-screen text**
-- OFW: **FatFs: apply upstream R0.12c patches, fix 0-byte files in fragmented exFAT directories**
-- OFW: **NFC: reject Ultralight READ/WRITE starting at the page count**
-- API: **Export `faac_slh_reset_prog_mode` for apps**
-- API: **Export `subghz_protocol_decoder_base_get_type` for apps**
-- API: **Export the T5577 block read/write API for apps (`t5577.h`, `t5577_file.h`)** (by @mishamyte | PR #1179)
-- iButton: **Fix write success text going off screen**
-- RFID: **Move the Writing screen text up so long file names fit**
-- GUI: **A screen that is covered no longer repaints the one on top of it** (by @mishamyte | PR #1198 | Closes #1196)
-- GUI: **Delete screens (SubGHz, NFC, RFID, iButton, Archive) fit a long file name**
-- Archive: **Stability pass over the file menu, deleting during a load, favourites and Show**
-- RFID: **T5577 app - `Saved` opens straight away, and a dump that will not open says why** (by @mishamyte | PR #1189)
-- RFID: **Fix the missing-T5577-app message pointing at the apps catalogue** (by @mishamyte | PR #1189)
-- Archive: **Fix the rename check missing an existing file whose extension is six characters long** (by @mishamyte | PR #1188)
-- RFID: **~1 KB of flash freed by sharing the duplicated LF write_data bodies** (by @mishamyte | PR #1183)
-- Dev: **Fix the infrared unit test checking a universal remote database that does not exist** (by @mishamyte | PR #1199)
-- Dev: **Fix the unit test firmware not building** (by @mishamyte | PR #1199 | Closes #1185)
-- Dev: **A unit test run that tested nothing no longer reports `Status: PASSED`** (by @mishamyte | PR #1206)
-- Dev: **CI builds the unit test firmware** (by @mishamyte | PR #1206)
-- Dev: **The NFC supported-card parsers have unit tests** (by @mishamyte | PR #1204)
-- Dev: **Unit test encoder round-trips feed the decoder what the radio would send** (by @mishamyte | PR #1207)
-- Core: **~7 KB of flash freed by parsing numbers without newlib's big-number machinery** (by @mishamyte | PR #1186 | Closes #1184)
+- OFW: Typos fixed in on-screen text - the Infrared "can't be openned as a remote" error and the updater's "C2 Stach switch failed"
+- OFW: FatFs: apply upstream R0.12c patches, fix 0-byte files in fragmented exFAT directories
+- API: Export `faac_slh_reset_prog_mode` for apps
+- API: Export the T5577 block read/write API for apps (`t5577.h`, `t5577_file.h`) (by @mishamyte | PR #1179)
+- iButton: Fix write success text going off screen
+- RFID: Move Writing screen text up so long file names fit
+- RFID: T5577 app - `Saved` opens straight away instead of reading past every key in the folder first, and a dump that will not open says whether it is gone from the card or is not a dump this version reads (by @mishamyte | PR #1189)
+- RFID: Fix the missing-T5577-app message telling you to install it from the apps catalogue - it comes with the firmware, in its SD resources (by @mishamyte | PR #1189)
+- Archive: Fix the rename check not warning about an existing file when the extension is six characters long, such as `.t5577` - the name it looked for was cut a character short (by @mishamyte | PR #1188)
+- RFID: ~1 KB of flash freed - the near-identical write_data bodies across 20 of the LF protocols now share one implementation per chip (by @mishamyte | PR #1183)
+- Core: **~7 KB of flash freed** - number parsing no longer pulls in newlib's big-number machinery for hex floats and inf/nan, which nothing uses. Values in `.ir`/`.sub`/`.nfc` files read back exactly as before (by @mishamyte | PR #1186 | Closes #1184)
 <br><br>
 
 ----
