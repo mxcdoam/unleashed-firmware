@@ -20,7 +20,8 @@ static const SubGhzBlockConst subghz_protocol_nero_radio_const = {
 // then 251 NRZ bits at 4800 baud: 11-bit header, 4 fixed sync words and 11 data words.
 // Every data word is one of 64 balanced 16-chip codes, so it carries 6 bits.
 // All 66 data bits change on each press (even the same button), so it can only be replayed.
-// Stored as Key = symbols 0..9 (6 bits each), Data = symbol 10.
+// Some remotes add a few fixed chips after the frame (10010101 on one, 1001011 on a copy).
+// Stored as Key = symbols 0..9 (6 bits each), Data = trailer length << 24 | trailer << 8 | symbol 10.
 #define NERO_RADIO_DYN_COUNT_BIT   66
 #define NERO_RADIO_DYN_TE          208
 #define NERO_RADIO_DYN_FRAME_BITS  251
@@ -31,6 +32,7 @@ static const SubGhzBlockConst subghz_protocol_nero_radio_const = {
 #define NERO_RADIO_DYN_PREAMBLE    34
 #define NERO_RADIO_DYN_CARRIER     128700
 #define NERO_RADIO_DYN_GAP         3000
+#define NERO_RADIO_DYN_TRAIL_MAX   16
 
 static const uint16_t nero_radio_dyn_sync[NERO_RADIO_DYN_SYNC_WORDS] = {
     0x896C,
@@ -79,6 +81,7 @@ struct SubGhzProtocolDecoderNeroRadio {
     uint16_t dyn_bit;
     uint16_t dyn_word;
     uint8_t dyn_last;
+    uint16_t dyn_trail;
     bool norm_id_ok;
     uint64_t norm_id;
     uint8_t norm_word;
@@ -103,31 +106,7 @@ typedef enum {
     NeroRadioDecoderStepNormIdSync,
     NeroRadioDecoderStepNormId,
     NeroRadioDecoderStepNormData,
-    NeroRadioDecoderStepDynData,
-    NeroRadioDecoderStepNormIdSync,
-    NeroRadioDecoderStepNormId,
-    NeroRadioDecoderStepNormData,
 } NeroRadioDecoderStep;
-
-/**
- * Hamming(7,4) codeword of a nibble, data bits first.
- * @param nibble Data
- * @return 7-bit codeword
- */
-static uint8_t subghz_protocol_nero_radio_hamming(uint8_t nibble) {
-    static const uint8_t parity[4] = {0x7, 0x6, 0x5, 0x3}; // for data bits 0..3
-    uint8_t par = 0;
-    for(uint8_t i = 0; i < 4; i++) {
-        if(nibble & (1 << i)) par ^= parity[i];
-    }
-    return (nibble << 3) | par;
-}
-
-static uint8_t subghz_protocol_decoder_nero_radio_get_hash_data(void* context);
-static SubGhzProtocolStatus subghz_protocol_decoder_nero_radio_serialize(
-    void* context,
-    FlipperFormat* flipper_format,
-    SubGhzRadioPreset* preset);
 
 /**
  * Hamming(7,4) codeword of a nibble, data bits first.
@@ -156,8 +135,6 @@ const SubGhzProtocolDecoder subghz_protocol_nero_radio_decoder = {
     .feed = subghz_protocol_decoder_nero_radio_feed,
     .reset = subghz_protocol_decoder_common_reset,
 
-    .get_hash_data = subghz_protocol_decoder_nero_radio_get_hash_data,
-    .serialize = subghz_protocol_decoder_nero_radio_serialize,
     .get_hash_data = subghz_protocol_decoder_nero_radio_get_hash_data,
     .serialize = subghz_protocol_decoder_nero_radio_serialize,
     .deserialize = subghz_protocol_decoder_nero_radio_deserialize,
@@ -232,7 +209,8 @@ static void nero_radio_preamble(NeroRadioChipWriter* writer, uint8_t count, uint
 static bool
     subghz_protocol_encoder_nero_radio_get_upload_dyn(SubGhzProtocolEncoderNeroRadio* instance) {
     // Carrier + preamble + sync + worst case one level per bit + gap
-    size_t size_upload = 2 + NERO_RADIO_DYN_PREAMBLE * 2 + 2 + NERO_RADIO_DYN_FRAME_BITS + 1;
+    size_t size_upload = 2 + NERO_RADIO_DYN_PREAMBLE * 2 + 2 + NERO_RADIO_DYN_FRAME_BITS +
+                         NERO_RADIO_DYN_TRAIL_MAX + 1;
     if(size_upload > instance->encoder.size_upload) {
         FURI_LOG_E(TAG, "Size upload exceeds allocated encoder buffer.");
         return false;
@@ -262,6 +240,10 @@ static bool
     }
     for(uint16_t chip = 0; chip < COUNT_OF(words) * 16; chip++) {
         nero_radio_chip(&writer, (words[chip >> 4] >> (15 - (chip & 0xF))) & 1);
+    }
+    uint8_t trail_len = MIN((uint8_t)(instance->generic.data_2 >> 24), NERO_RADIO_DYN_TRAIL_MAX);
+    for(uint8_t i = 0; i < trail_len; i++) {
+        nero_radio_chip(&writer, (instance->generic.data_2 >> (8 + trail_len - 1 - i)) & 1);
     }
     nero_radio_chip_gap(&writer, NERO_RADIO_DYN_GAP);
 
@@ -331,12 +313,6 @@ static bool
 static bool
     subghz_protocol_encoder_nero_radio_get_upload(SubGhzProtocolEncoderNeroRadio* instance) {
     furi_assert(instance);
-    if(instance->generic.data_count_bit == NERO_RADIO_DYN_COUNT_BIT) {
-        return subghz_protocol_encoder_nero_radio_get_upload_dyn(instance);
-    }
-    if(instance->generic.data_count_bit == NERO_RADIO_NORM_COUNT_BIT) {
-        return subghz_protocol_encoder_nero_radio_get_upload_norm(instance);
-    }
     if(instance->generic.data_count_bit == NERO_RADIO_DYN_COUNT_BIT) {
         return subghz_protocol_encoder_nero_radio_get_upload_dyn(instance);
     }
@@ -440,41 +416,6 @@ static SubGhzProtocolStatus subghz_protocol_nero_radio_deserialize_key(
     return SubGhzProtocolStatusOk;
 }
 
-/**
- * Deserialize the key, accepting the 56/57 bit static and the 66 bit dynamic format.
- * @param generic Pointer to a SubGhzBlockGeneric instance
- * @param flipper_format Pointer to a FlipperFormat instance
- * @return status
- */
-static SubGhzProtocolStatus subghz_protocol_nero_radio_deserialize_key(
-    SubGhzBlockGeneric* generic,
-    FlipperFormat* flipper_format) {
-    SubGhzProtocolStatus ret = subghz_block_generic_deserialize_check_count_bit(
-        generic, flipper_format, subghz_protocol_nero_radio_const.min_count_bit_for_found);
-    if(ret != SubGhzProtocolStatusErrorValueBitCount) {
-        return ret;
-    }
-    if(generic->data_count_bit == 57) {
-        return SubGhzProtocolStatusOk;
-    }
-    if((generic->data_count_bit != NERO_RADIO_DYN_COUNT_BIT) &&
-       (generic->data_count_bit != NERO_RADIO_NORM_COUNT_BIT)) {
-        return ret;
-    }
-
-    uint8_t key_data[sizeof(uint64_t)] = {0};
-    if(!flipper_format_rewind(flipper_format) ||
-       !flipper_format_read_hex(flipper_format, "Data", key_data, sizeof(uint64_t))) {
-        FURI_LOG_E(TAG, "Missing Data");
-        return SubGhzProtocolStatusErrorParserOthers;
-    }
-    generic->data_2 = 0;
-    for(uint8_t i = 0; i < sizeof(uint64_t); i++) {
-        generic->data_2 = generic->data_2 << 8 | key_data[i];
-    }
-    return SubGhzProtocolStatusOk;
-}
-
 SubGhzProtocolStatus
     subghz_protocol_encoder_nero_radio_deserialize(void* context, FlipperFormat* flipper_format) {
     furi_assert(context);
@@ -484,12 +425,8 @@ SubGhzProtocolStatus
         ret = subghz_protocol_nero_radio_deserialize_key(&instance->generic, flipper_format);
         if(ret != SubGhzProtocolStatusOk) {
             break;
-        ret = subghz_protocol_nero_radio_deserialize_key(&instance->generic, flipper_format);
-        if(ret != SubGhzProtocolStatusOk) {
-            break;
         }
         // Optional value
-        flipper_format_rewind(flipper_format);
         flipper_format_rewind(flipper_format);
         flipper_format_read_uint32(
             flipper_format, "Repeat", (uint32_t*)&instance->encoder.repeat, 1);
@@ -519,7 +456,12 @@ void* subghz_protocol_decoder_nero_radio_alloc(SubGhzEnvironment* environment) {
 static bool
     subghz_protocol_nero_radio_dyn_add_bit(SubGhzProtocolDecoderNeroRadio* instance, bool bit) {
     uint16_t pos = instance->dyn_bit++;
-    if(pos >= NERO_RADIO_DYN_FRAME_BITS) return false;
+    if(pos >= NERO_RADIO_DYN_FRAME_BITS) {
+        // Fixed trailer some remotes send after the frame
+        if(pos >= NERO_RADIO_DYN_FRAME_BITS + NERO_RADIO_DYN_TRAIL_MAX) return false;
+        instance->dyn_trail = (instance->dyn_trail << 1) | bit;
+        return true;
+    }
     if(pos < NERO_RADIO_DYN_HEADER_BITS) {
         return bit == ((NERO_RADIO_DYN_HEADER >> (NERO_RADIO_DYN_HEADER_BITS - 1 - pos)) & 1);
     }
@@ -608,8 +550,6 @@ void subghz_protocol_decoder_nero_radio_feed(void* context, bool level, uint32_t
                (DURATION_DIFF(duration, subghz_protocol_nero_radio_const.te_short * 4) <
                 subghz_protocol_nero_radio_const.te_delta) ||
                (DURATION_DIFF(duration, subghz_protocol_nero_radio_const.te_long) <
-                subghz_protocol_nero_radio_const.te_delta) ||
-               (DURATION_DIFF(duration, subghz_protocol_nero_radio_const.te_long) <
                 subghz_protocol_nero_radio_const.te_delta)) {
                 instance->decoder.te_last = duration;
             } else {
@@ -626,6 +566,7 @@ void subghz_protocol_decoder_nero_radio_feed(void* context, bool level, uint32_t
                 instance->decoder.decode_count_bit = 0;
                 instance->dyn_bit = 0;
                 instance->dyn_word = 0;
+                instance->dyn_trail = 0;
             } else {
                 instance->decoder.parser_step = NeroRadioDecoderStepReset;
             }
@@ -688,8 +629,6 @@ void subghz_protocol_decoder_nero_radio_feed(void* context, bool level, uint32_t
         if(!level) {
             // Data lows are 200/400 us, frames end with 1.0..1.3 ms or a longer gap
             if(duration >= ((uint32_t)900)) {
-            // Data lows are 200/400 us, frames end with 1.0..1.3 ms or a longer gap
-            if(duration >= ((uint32_t)900)) {
                 //Found stop bit
                 if(DURATION_DIFF(
                        instance->decoder.te_last, subghz_protocol_nero_radio_const.te_short) <
@@ -742,13 +681,16 @@ void subghz_protocol_decoder_nero_radio_feed(void* context, bool level, uint32_t
     case NeroRadioDecoderStepDynData:
         if(!level && (duration >= 1500)) {
             // Gap: trailing zero chips of the last word merge into it
-            bool valid = (NERO_RADIO_DYN_FRAME_BITS - instance->dyn_bit) <= 8;
+            bool valid = (instance->dyn_bit + 8) >= NERO_RADIO_DYN_FRAME_BITS;
             while(valid && instance->dyn_bit < NERO_RADIO_DYN_FRAME_BITS) {
                 valid = subghz_protocol_nero_radio_dyn_add_bit(instance, false);
             }
             if(valid) {
                 instance->generic.data = instance->decoder.decode_data;
-                instance->generic.data_2 = instance->dyn_last;
+                uint32_t trail_len = instance->dyn_bit - NERO_RADIO_DYN_FRAME_BITS;
+                instance->generic.data_2 = ((uint64_t)trail_len << 24) |
+                                           ((uint32_t)instance->dyn_trail << 8) |
+                                           instance->dyn_last;
                 instance->generic.data_count_bit = NERO_RADIO_DYN_COUNT_BIT;
                 instance->decoder.decode_count_bit = NERO_RADIO_DYN_COUNT_BIT;
 
@@ -866,7 +808,7 @@ static uint8_t subghz_protocol_decoder_nero_radio_get_hash_data(void* context) {
     SubGhzProtocolDecoderNeroRadio* instance = context;
     if(instance->decoder.decode_count_bit == NERO_RADIO_DYN_COUNT_BIT) {
         return subghz_protocol_blocks_get_hash_data(&instance->decoder, sizeof(uint64_t)) ^
-               instance->dyn_last;
+               instance->dyn_last ^ (uint8_t)instance->dyn_trail;
     }
     if(instance->decoder.decode_count_bit == NERO_RADIO_NORM_COUNT_BIT) {
         return subghz_protocol_blocks_get_hash_data(&instance->decoder, sizeof(uint64_t)) ^
@@ -895,26 +837,8 @@ static void subghz_protocol_nero_radio_parse_data(SubGhzBlockGeneric* instance) 
     // F6C18101 n1 6r 25
     // 57 bit remote, extra bit trails: B2230602 n4 Br 96 + 1, r = 2 for n = 1
     // So r = bit reversed n ^ per remote const (0, A, D seen)
-    //
-    // Held button, one remote (n = hold counter, steps every ~8 frames, restarts per press)
-    // F6C18102 n1 6r E5   r = n bit reversed: 0160 1168 2164 316C ... D16B F16F
-    // F6C18101 n1 6r 25
-    // 57 bit remote, extra bit trails: B2230602 n4 Br 96 + 1, r = 2 for n = 1
-    // So r = bit reversed n ^ per remote const (0, A, D seen)
 
     // possible contents
-    // serial  button  hold cnt  ?    check
-    // 5725050 1       0         49D  D3
-    // 5725050 2       0         49D  13
-    // 36E4E80 1       0         4A6  44
-    // F6C1810 2       D         16B  E5
-    // check depends on serial and button only, not a CRC8 or sum
-
-    // 57 bit frames carry one extra trailing bit
-    uint64_t data = instance->data >> (instance->data_count_bit - 56);
-    instance->serial = data >> 28;
-    instance->btn = (data >> 24) & 0xF;
-    instance->cnt = (data >> 20) & 0xF;
     // serial  button  hold cnt  ?    check
     // 5725050 1       0         49D  D3
     // 5725050 2       0         49D  13
@@ -935,40 +859,6 @@ void subghz_protocol_decoder_nero_radio_get_string(void* context, FuriString* ou
 
     uint32_t code_found_hi = instance->generic.data >> 32;
     uint32_t code_found_lo = instance->generic.data & 0x00000000ffffffff;
-
-    if(instance->generic.data_count_bit == NERO_RADIO_DYN_COUNT_BIT) {
-        subghz_block_generic_global.btn_is_available = false;
-        furi_string_cat_printf(
-            output,
-            "%s %dbit\r\n"
-            "Key:0x%lX%08lX\r\n"
-            "Data:%02X\r\n"
-            "Rolling long range,\r\nreplay only\r\n",
-            instance->generic.protocol_name,
-            instance->generic.data_count_bit,
-            code_found_hi,
-            code_found_lo,
-            (uint8_t)instance->generic.data_2);
-        return;
-    }
-    if(instance->generic.data_count_bit == NERO_RADIO_NORM_COUNT_BIT) {
-        subghz_block_generic_global.btn_is_available = false;
-        uint64_t id = instance->generic.data_2 >> 8;
-        furi_string_cat_printf(
-            output,
-            "%s %dbit\r\n"
-            "Key:0x%08lX%08lX\r\n"
-            "Id:0x%05lX%08lX Tail:%02X\r\n"
-            "Rolling, replay only\r\n",
-            instance->generic.protocol_name,
-            instance->generic.data_count_bit,
-            code_found_hi,
-            code_found_lo,
-            (uint32_t)(id >> 32),
-            (uint32_t)id,
-            (uint8_t)instance->generic.data_2);
-        return;
-    }
 
     if(instance->generic.data_count_bit == NERO_RADIO_DYN_COUNT_BIT) {
         subghz_block_generic_global.btn_is_available = false;
@@ -1025,8 +915,6 @@ void subghz_protocol_decoder_nero_radio_get_string(void* context, FuriString* ou
         "Yek:0x%lX%08lX\r\n"
         "Sn:0x%07lX Btn:%X\r\n"
         "Hold:%lX Chk:0x%02X\r\n",
-        "Sn:0x%07lX Btn:%X\r\n"
-        "Hold:%lX Chk:0x%02X\r\n",
         instance->generic.protocol_name,
         instance->generic.data_count_bit,
         code_found_hi,
@@ -1037,4 +925,17 @@ void subghz_protocol_decoder_nero_radio_get_string(void* context, FuriString* ou
         instance->generic.btn,
         instance->generic.cnt,
         (uint8_t)(instance->generic.data >> (instance->generic.data_count_bit - 56)));
+}
+
+SubGhzProtocolType subghz_protocol_decoder_nero_radio_get_type(void* context) {
+    furi_assert(context);
+    SubGhzProtocolDecoderNeroRadio* instance = context;
+
+    // The short format is a fixed code; both longer ones roll
+    if((instance->generic.data_count_bit == NERO_RADIO_DYN_COUNT_BIT) ||
+       (instance->generic.data_count_bit == NERO_RADIO_NORM_COUNT_BIT)) {
+        return SubGhzProtocolTypeDynamic;
+    }
+
+    return subghz_protocol_nero_radio.type;
 }
