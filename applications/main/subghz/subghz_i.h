@@ -40,6 +40,7 @@
 #include "helpers/subghz_txrx.h"
 #include "helpers/subghz_add_manually_plugin.h"
 #include "helpers/subghz_frequency_analyzer_plugin.h"
+#include "helpers/subghz_scene_plugin.h"
 
 #include <flipper_application/plugins/composite_resolver.h>
 #include <flipper_application/plugins/plugin_manager.h>
@@ -99,20 +100,35 @@ struct SubGhz {
     // the LED ends up saying the opposite of the bar. Decided once, read everywhere
     bool history_full;
 
-    // Feature plugins, mapped on demand: the analyzer while its scene is current, Add Manually
-    // until the start scene is reached again. The resolver they share is refcounted rather than
-    // owned by whichever loaded first.
+    // Feature plugins, mapped on demand: the analyzer and the settings scenes while their scene
+    // is current, Add Manually until the start scene is reached again. The resolver they share is
+    // refcounted rather than owned by whichever loaded first.
     CompositeApiResolver* api_resolver;
     uint8_t api_resolver_refs;
     PluginManager* freq_analyzer_plugin_manager;
     const SubGhzFrequencyAnalyzerPlugin* freq_analyzer_plugin;
     PluginManager* add_manually_plugin_manager;
     const SubGhzAddManuallyPlugin* add_manually_plugin;
+    PluginManager* scene_plugin_manager;
+    const SubGhzScenePlugin* scene_plugin;
 
     uint16_t idx_menu_chosen;
     SubGhzLoadTypeFile load_type_file;
     uint8_t tx_power;
     void* rpc_ctx;
+
+    // Kept at the end: the Add Manually and Frequency Analyzer plugins are loaded from the
+    // SD card and read this struct, and fields added here leave every offset they know alone
+
+    // The read list is written from two threads: by the radio worker, in the receive
+    // callback, and by the GUI. This serialises them, and idx_menu_chosen with the list it
+    // indexes. Never hold it across anything that stops RX: stopping joins the worker
+    // thread, and that thread may be waiting for this very mutex
+    FuriMutex* history_mutex;
+    // Set once Info has the signal at idx_menu_chosen open, until the list is shown again.
+    // Send and Save act on that signal, so while this is set it is never dropped to make
+    // room, and idx_menu_chosen follows it instead of following the list's cursor
+    bool history_item_open;
 };
 
 #ifdef __cplusplus

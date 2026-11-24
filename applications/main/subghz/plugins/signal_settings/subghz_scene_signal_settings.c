@@ -1,6 +1,7 @@
-#include "../subghz_i.h"
+#include <subghz/subghz_i.h>
+#include <subghz/helpers/subghz_txrx_i.h>
 #include "subghz/types.h"
-#include "../helpers/subghz_custom_event.h"
+#include <subghz/helpers/subghz_custom_event.h>
 #include <lib/toolbox/value_index.h>
 #include <machine/endian.h>
 #include <toolbox/strint.h>
@@ -22,7 +23,7 @@ static uint8_t* btn_byte_ptr = NULL;
 
 static uint8_t submenu_called = 0;
 
-#define COUNTER_MODE_COUNT 10
+#define COUNTER_MODE_COUNT 11
 static const char* const counter_mode_text[COUNTER_MODE_COUNT] = {
     "System",
     "Mode 1",
@@ -34,6 +35,7 @@ static const char* const counter_mode_text[COUNTER_MODE_COUNT] = {
     "Mode 7",
     "Mode 8",
     "Mode 9",
+    "Mode 10",
 };
 
 static const int32_t counter_mode_value[COUNTER_MODE_COUNT] = {
@@ -47,6 +49,7 @@ static const int32_t counter_mode_value[COUNTER_MODE_COUNT] = {
     7,
     8,
     9,
+    10,
 };
 
 typedef struct {
@@ -59,7 +62,7 @@ static Protocols protocols[] = {
     {"Nice FloR-S", 3},
     {"CAME Atomo", 4},
     {"Alutech AT-4N", 3},
-    {"KeeLoq", 10},
+    {"KeeLoq", 11},
     {"Phoenix_V2", 3},
 };
 
@@ -222,10 +225,10 @@ void subghz_scene_signal_settings_on_enter(void* context) {
     variable_item_set_locked(item, (counter_mode == 0xff), "Not available\nfor this\nprotocol !");
     //
 
-    SubGhzProtocolDecoderBase* decoder = subghz_txrx_get_decoder(subghz->txrx);
+    SubGhzProtocolDecoderBase* decoder = subghz->txrx->decoder_result;
 
     // deserialaze and decode loaded sugbhz file and push data to subghz_block_generic_global variable
-    if(subghz_protocol_decoder_base_deserialize(decoder, subghz_txrx_get_fff_data(subghz->txrx)) ==
+    if(subghz_protocol_decoder_base_deserialize(decoder, subghz->txrx->fff_data) ==
        SubGhzProtocolStatusOk) {
         subghz_protocol_decoder_base_get_string(decoder, tmp_text);
     } else {
@@ -302,14 +305,14 @@ bool subghz_scene_signal_settings_on_event(void* context, SceneManagerEvent even
                     // set new cnt value and override_flag to global variable and call transmit to generate and save subghz signal
                     counter16 = __bswap16(counter16);
                     subghz_block_generic_global_counter_override_set(counter16);
-                    subghz_tx_start(subghz, subghz_txrx_get_fff_data(subghz->txrx));
+                    subghz_tx_start(subghz, subghz->txrx->fff_data);
                     subghz_txrx_stop(subghz->txrx);
                     break;
                 case 4:
                     // the same for 32 bit Counter
                     counter32 = __bswap32(counter32);
                     subghz_block_generic_global_counter_override_set(counter32);
-                    subghz_tx_start(subghz, subghz_txrx_get_fff_data(subghz->txrx));
+                    subghz_tx_start(subghz, subghz->txrx->fff_data);
                     subghz_txrx_stop(subghz->txrx);
                     break;
                 default:
@@ -317,16 +320,30 @@ bool subghz_scene_signal_settings_on_event(void* context, SceneManagerEvent even
                 }
                 break;
             // edit button
-            case 2:
+            case 2: {
                 subghz_block_generic_global_button_override_set(button);
                 // save counter mult to rewrite subghz singnal without changing counter
                 int32_t tmp_counter = furi_hal_subghz_get_rolling_counter_mult();
                 furi_hal_subghz_set_rolling_counter_mult(0);
-                subghz_tx_start(subghz, subghz_txrx_get_fff_data(subghz->txrx));
+                bool sent = subghz_tx_start(subghz, subghz->txrx->fff_data);
                 subghz_txrx_stop(subghz->txrx);
                 // restore counter mult
                 furi_hal_subghz_set_rolling_counter_mult(tmp_counter);
+
+                // The encoder writes the new button into fff_data, but the save-back
+                // on TX stop only runs for dynamic protocols, where a rolling counter
+                // has to be kept. A static protocol has no counter to keep, so nothing
+                // flushed the buffer: the new button went on the air once and the file
+                // kept the old one. Flush it here for those protocols.
+                // Not when the send was refused (frequency outside the TX range, no
+                // memory): nothing was transmitted and the user saw the error, so the
+                // file is left alone.
+                if(sent &&
+                   subghz->txrx->decoder_result->protocol->type != SubGhzProtocolTypeDynamic) {
+                    subghz_save_to_file(subghz);
+                }
                 break;
+            }
 
             default:
                 break;
@@ -357,3 +374,5 @@ void subghz_scene_signal_settings_on_exit(void* context) {
     byte_input_set_header_text(subghz->byte_input, "");
     furi_string_free(byte_input_text);
 }
+
+SUBGHZ_SCENE_PLUGIN_DEFINE(signal_settings)
